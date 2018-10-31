@@ -1,0 +1,43 @@
+data_sets:
+    - name: SRR5860570
+      paired: True
+      path: FASTQs/otherSec/SRR5860570/
+      experimental: control
+    - name: 10A
+      paired: True
+      path: FASTQs/2011/10A/
+      experimental: selection
+    - name: SECH1
+      paired: True
+      path: FASTQs/matuteSec/SECH1/
+      species: drosophila sechellia
+    - name: SECH2
+      paired: True
+      path: FASTQs/matuteSec/SECH2/
+      species: drosophila sechellia
+    - name: SECH3
+      paired: True
+      path: FASTQs/matuteSec/SECH3/
+      species: drosophila sechellia
+
+
+reference_genomes:
+    - name: droSim1
+      species: drosophila simulans
+      path: /proj/cdjones_lab/Genomics_Data_Commons/genomes/drosophila_simulans/droSim1.fa
+      fai: /proj/cdjones_lab/Genomics_Data_Commons/genomes/drosophila_simulans/droSim1.fa.fai
+    - name: droSec1
+      species: drosophila sechellia
+      path: /proj/cdjones_lab/Genomics_Data_Commons/genomes/drosophila_sechellia/droSec1.fa
+      fai: /proj/cdjones_lab/Genomics_Data_Commons/genomes/drosophila_sechellia/droSec1.fa.fai
+    - name: dm6
+      species: drosophila melanogaster
+      path: /proj/cdjones_lab/Genomics_Data_Commons/genomes/drosophila_melanogaster/dm6.fa
+      fai: /proj/cdjones_lab/Genomics_Data_Commons/genomes/drosophila_melanogaster/dm6.fa.fai
+
+
+lift_genomes:
+      dm6:
+            droSec1: /proj/cdjones_lab/Genomics_Data_Commons/genomes/LiftOver/droSec1ToDm6.over.chain
+            droSim1: /proj/cdjones_lab/Genomics_Data_Commons/genomes/LiftOver/droSim1ToDm6.over.chain
+
