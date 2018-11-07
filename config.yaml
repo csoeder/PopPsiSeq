@@ -9,8 +9,8 @@ data_sets:
       paired: True
       path: FASTQs/2013/10A/
       experimental: selection
-      readsfile1: 10A.clean.R1.fastq
-      readsfile2: 10A.clean.R2.fastq
+      readsfile1: 10A.R1.fastq
+      readsfile2: 10A.R2.fastq
     - name: SRR303333
       paired: False
       path: FASTQs/2011/SRR303333/
@@ -51,7 +51,7 @@ data_sets:
       path: FASTQs/matuteSim/MD73m11d04y2010/
       species: drosophila simulans
       readsfile1: MD73_11_04_2010_54_R1_001.fastq
-      readsfile2: MD73_11_04_2010_54_R2_001
+      readsfile2: MD73_11_04_2010_54_R2_001.fastq
 
 
 
