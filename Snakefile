@@ -1,6 +1,7 @@
 configfile: 'config.yaml'
 
 sample_by_name = {c['name'] : c for c in config['data_sets']}
+ref_genome_by_name = { g['name'] : g for g in config['reference_genomes']}
 
 
 def return_filename_by_sampname(sampname):
@@ -38,14 +39,14 @@ rule fastp_clean_sample_pe:
 		fileIn = lambda wildcards: return_file_relpath_by_sampname(wildcards)
 	output:
 		fileOut = ["{pathprefix}/{samplename}.clean.R1.fastq","{pathprefix}/{samplename}.clean.R2.fastq"],
-		reportBack = "meta/FASTP/{samplename}.json"
+		#reportBack = "{pathprefix}/{samplename}.json"
 	params:
 		#--trim_front1 and -t, --trim_tail1
 		#--trim_front2 and -T, --trim_tail2. 
 		common_params = "--json meta/FASTP/{samplename}.json --html meta/FASTP/{samplename}.html", 
 		pe_params = "--detect_adapter_for_pe --correction",
 	shell:
-		"/nas/longleaf/home/csoeder/modules/fastp/fastp {params.common_params} {params.pe_params} --in1 {input.fileIn[0]} --out1 {output.fileOut[0]} --in1 {input.fileIn[1]} --out1 {output.fileOut[1]}"
+		"/nas/longleaf/home/csoeder/modules/fastp/fastp {params.common_params} {params.pe_params} --in1 {input.fileIn[0]} --out1 {output.fileOut[0]} --in2 {input.fileIn[1]} --out2 {output.fileOut[1]}"
 
 #request reportBacks instead, process them into a unified SQL upload?
 rule clean_all_samps:
@@ -56,3 +57,28 @@ rule clean_all_samps:
 		outflg = "allclean.flag"
 	shell:
 		"touch {output.outflg}"
+
+rule bwa_align:
+	input:
+		reads_in = lambda wildcards: expand("{path}{sample}.clean.R{arr}.fastq", path=sample_by_name[wildcards.sample]['path'], sample=wildcards.sample, arr=[ [1,2] if sample_by_name[wildcards.sample]['paired'] else [0] ][0]),
+		ref_genome_file = lambda wildcards: ref_genome_by_name[wildcards.ref_genome]['path'],
+	output:
+		bam_out = "mapped_reads/{sample}.vs{ref_genome}.sort.bam",
+	run:
+		shell("bwa aln {input.ref_genome_file} {input.reads_in[0]} > {input.reads_in[0]}.sai ")
+		if sample_by_name[wildcards.sample]['paired']:
+			shell("bwa aln {input.ref_genome_file} {input.reads_in[1]} > {input.reads_in[1]}.sai ")
+			shell("bwa sampe {input.ref_genome_file} {input.reads_in[0]}.sai {input.reads_in[1]}.sai {input.reads_in[0]}  {input.reads_in[1]} | samtools view -Shb | samtools addreplacerg -r ID:{wildcards.sample} - | samtools sort -o {output.bam_out} - ")
+		else:
+			shell("bwa samse {input.ref_genome_file} {input.reads_in[0]}.sai {input.reads_in[0]} | samtools view -Shb | samtools addreplacerg -r ID:{wildcards.sample} - | samtools sort -o {output.bam_out} - ")
+		shell("samtools index {output.bam_out}")
+
+
+
+
+
+
+
+
+
+
