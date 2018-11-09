@@ -48,7 +48,7 @@ rule fastp_clean_sample_pe:
 	shell:
 		"/nas/longleaf/home/csoeder/modules/fastp/fastp {params.common_params} {params.pe_params} --in1 {input.fileIn[0]} --out1 {output.fileOut[0]} --in2 {input.fileIn[1]} --out2 {output.fileOut[1]}"
 
-#request reportBacks instead, process them into a unified SQL upload?
+#request FASTP reportBacks instead, process them into a unified SQL upload?
 rule clean_all_samps:
 	input: 
 		clean_se = [sample_by_name[nom]['path']+nom+".clean.R0.fastq" for nom in sample_by_name.keys() if not sample_by_name[nom]['paired']],
@@ -58,12 +58,14 @@ rule clean_all_samps:
 	shell:
 		"touch {output.outflg}"
 
+
+#	request stats/idxstats/flagstats?  
 rule bwa_align:
 	input:
 		reads_in = lambda wildcards: expand("{path}{sample}.clean.R{arr}.fastq", path=sample_by_name[wildcards.sample]['path'], sample=wildcards.sample, arr=[ [1,2] if sample_by_name[wildcards.sample]['paired'] else [0] ][0]),
 		ref_genome_file = lambda wildcards: ref_genome_by_name[wildcards.ref_genome]['path'],
 	output:
-		bam_out = "mapped_reads/{sample}.vs{ref_genome}.sort.bam",
+		bam_out = "mapped_reads/{sample}.vs_{ref_genome}.bwa.sort.bam",
 	run:
 		shell("bwa aln {input.ref_genome_file} {input.reads_in[0]} > {input.reads_in[0]}.sai ")
 		if sample_by_name[wildcards.sample]['paired']:
@@ -74,7 +76,21 @@ rule bwa_align:
 		shell("samtools index {output.bam_out}")
 
 
+#	request stats/idxstats/flagstats?  
 
+rule bwa_uniq:
+	input:
+		bam_in = "mapped_reads/{sample}.vs_{ref_genome}.bwa.sort.bam"
+	output:
+		bam_out = "mapped_reads/{sample}.vs_{ref_genome}.bwaUniq.sort.bam"
+	params:
+		quality="-q 20 -F 0x0100 -F 0x0200 -F 0x0300 -F 0x04",
+		uniqueness="XT:A:U.*X0:i:1.*X1:i:0",
+	run:
+		ref_genome_file=ref_genome_by_name[wildcards.ref_genome]['path']
+		#original; no dedupe
+		#"samtools view {params.quality} {input.bam_in} | grep -E {params.uniqueness} | samtools view -bS -T {ref_genome} - | samtools sort -o {output.bam_out} - "
+		shell("samtools view {params.quality} {input.bam_in} | grep -E {params.uniqueness} | samtools view -bS -T {ref_genome_file} - |samtools sort -n - | samtools fixmate -m - - | samtools sort - | samtools markdup -r - {output.bam_out}")
 
 
 
