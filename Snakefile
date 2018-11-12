@@ -1,5 +1,7 @@
 configfile: 'config.yaml'
 
+#module load python/3.5.1 samtools freebayes vcftools
+
 sample_by_name = {c['name'] : c for c in config['data_sets']}
 ref_genome_by_name = { g['name'] : g for g in config['reference_genomes']}
 
@@ -91,7 +93,21 @@ rule bwa_uniq:
 		#original; no dedupe
 		#"samtools view {params.quality} {input.bam_in} | grep -E {params.uniqueness} | samtools view -bS -T {ref_genome} - | samtools sort -o {output.bam_out} - "
 		shell("samtools view {params.quality} {input.bam_in} | grep -E {params.uniqueness} | samtools view -bS -T {ref_genome_file} - |samtools sort -n - | samtools fixmate -m - - | samtools sort - | samtools markdup -r - {output.bam_out}")
+		shell("samtools index {output.bam_out}")
 
+
+rule joint_vcf_caller:
+	input:
+		bams_in = lambda wildcards: expand("mapped_reads/{sample}.vs_{ref_genome}.{aligner}.sort.bam", sample=sample_by_name.keys(), ref_genome=wildcards.ref_genome, aligner=wildcards.aligner),
+	output:
+		vcf_out = "all_samples.vs_{ref_genome}.{aligner}.vcf"
+	params:
+		freebayes="--standard-filters",
+		runmem_gb=8,
+		runtime="12:00:00"
+	run:
+		ref_genome_file=ref_genome_by_name[wildcards.ref_genome]['path']
+		shell("freebayes {params.freebayes} -f {ref_genome_file} {input.bams_in} | vcftools --remove-indels --vcf - --recode --recode-INFO-all --stdout  > {output.joint_vcf}")
 
 
 
