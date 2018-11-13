@@ -27,6 +27,7 @@ rule fastp_clean_sample_se:
 		fileIn = lambda wildcards: return_file_relpath_by_sampname(wildcards)
 	output:
 		fileOut = ["{pathprefix}/{samplename}.clean.R0.fastq"],
+		jason = "meta/FASTP/{samplename}.json"
 	params:
 		#--trim_front1 and -t, --trim_tail1
 		#--trim_front2 and -T, --trim_tail2. 
@@ -41,7 +42,7 @@ rule fastp_clean_sample_pe:
 		fileIn = lambda wildcards: return_file_relpath_by_sampname(wildcards)
 	output:
 		fileOut = ["{pathprefix}/{samplename}.clean.R1.fastq","{pathprefix}/{samplename}.clean.R2.fastq"],
-		#reportBack = "{pathprefix}/{samplename}.json"
+		jason = "meta/FASTP/{samplename}.json"
 	params:
 		#--trim_front1 and -t, --trim_tail1
 		#--trim_front2 and -T, --trim_tail2. 
@@ -51,14 +52,30 @@ rule fastp_clean_sample_pe:
 		"/nas/longleaf/home/csoeder/modules/fastp/fastp {params.common_params} {params.pe_params} --in1 {input.fileIn[0]} --out1 {output.fileOut[0]} --in2 {input.fileIn[1]} --out2 {output.fileOut[1]}"
 
 #request FASTP reportBacks instead, process them into a unified SQL upload?
-rule clean_all_samps:
+# rule clean_all_samps:
+# 	input: 
+# 		clean_se = [sample_by_name[nom]['path']+nom+".clean.R0.fastq" for nom in sample_by_name.keys() if not sample_by_name[nom]['paired']],
+# 		clean_pe = [sample_by_name[nom]['path']+nom+".clean.R"+arr+".fastq" for nom in sample_by_name.keys() if sample_by_name[nom]['paired'] for arr in ["1","2"]],
+# 	output:
+# 		outflg = "allclean.flag"
+# 	shell:
+# 		"touch {output.outflg}"
+
+rule FASTP_summarizer:
 	input: 
-		clean_se = [sample_by_name[nom]['path']+nom+".clean.R0.fastq" for nom in sample_by_name.keys() if not sample_by_name[nom]['paired']],
-		clean_pe = [sample_by_name[nom]['path']+nom+".clean.R"+arr+".fastq" for nom in sample_by_name.keys() if sample_by_name[nom]['paired'] for arr in ["1","2"]],
+		jason = "meta/FASTP/{samplename}.json"
 	output:
-		outflg = "allclean.flag"
+		jason_pruned = "meta/FASTP/{samplename}.json.pruned"
 	shell:
-		"touch {output.outflg}"
+		"python scripts/fastp_reporter.py {input.jason} {output.jason_pruned} --t {wildcards.samplename}"
+
+rule demand_FASTQ_analytics:	#forces a FASTP clean
+	input:
+		jasons_in = expand("meta/FASTP/{samplename}.json.pruned", samplename = sample_by_name.keys())
+	output:
+		summary = "meta/sequenced_reads.dat"
+	run:
+		"cat {input.jasons_in} > {output.summary}"
 
 
 #	request stats/idxstats/flagstats?  
@@ -109,8 +126,10 @@ rule joint_vcf_caller:
 		ref_genome_file=ref_genome_by_name[wildcards.ref_genome]['path']
 		shell("freebayes {params.freebayes} -f {ref_genome_file} {input.bams_in} | vcftools --remove-indels --vcf - --recode --recode-INFO-all --stdout  > {output.joint_vcf}")
 
-
-
-
-
-
+rule write_report:
+	input:
+		sequenced_reads_summary=["meta/sequenced_reads.dat"],
+	output:
+		pdf_out="thingy.pdf"
+	run:
+		"touch {output.pdf_out}"
