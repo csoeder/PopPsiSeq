@@ -27,11 +27,11 @@ rule fastp_clean_sample_se:
 		fileIn = lambda wildcards: return_file_relpath_by_sampname(wildcards)
 	output:
 		fileOut = ["{pathprefix}/{samplename}.clean.R0.fastq"],
-		jason = "meta/FASTP/{samplename}.json"
+		jason = "{pathprefix}/{samplename}.False.json"
 	params:
 		#--trim_front1 and -t, --trim_tail1
 		#--trim_front2 and -T, --trim_tail2. 
-		common_params = "--json meta/FASTP/{samplename}.json --html meta/FASTP/{samplename}.html", 
+		common_params = "--json {pathprefix}/{samplename}.False.json",# --html meta/FASTP/{samplename}.html", 
 		se_params = "",
 	shell:
 		"/nas/longleaf/home/csoeder/modules/fastp/fastp {params.common_params} {params.se_params} --in1 {input.fileIn[0]} --out1 {output.fileOut[0]}"
@@ -42,11 +42,11 @@ rule fastp_clean_sample_pe:
 		fileIn = lambda wildcards: return_file_relpath_by_sampname(wildcards)
 	output:
 		fileOut = ["{pathprefix}/{samplename}.clean.R1.fastq","{pathprefix}/{samplename}.clean.R2.fastq"],
-		jason = "meta/FASTP/{samplename}.json"
+		jason = "{pathprefix}/{samplename}.True.json"
 	params:
 		#--trim_front1 and -t, --trim_tail1
 		#--trim_front2 and -T, --trim_tail2. 
-		common_params = "--json meta/FASTP/{samplename}.json --html meta/FASTP/{samplename}.html", 
+		common_params = "--json {pathprefix}/{samplename}.True.json",# --html meta/FASTP/{samplename}.html", 
 		pe_params = "--detect_adapter_for_pe --correction",
 	shell:
 		"/nas/longleaf/home/csoeder/modules/fastp/fastp {params.common_params} {params.pe_params} --in1 {input.fileIn[0]} --out1 {output.fileOut[0]} --in2 {input.fileIn[1]} --out2 {output.fileOut[1]}"
@@ -61,13 +61,18 @@ rule fastp_clean_sample_pe:
 # 	shell:
 # 		"touch {output.outflg}"
 
+lambda wildcards: return_file_relpath_by_sampname(wildcards)
+
 rule FASTP_summarizer:
 	input: 
-		jason = "meta/FASTP/{samplename}.json"
+		jason = lambda wildcards: expand("{path}{samp}.{pairt}.json", path=sample_by_name[wildcards.samplename]['path'], samp = wildcards.samplename, pairt = sample_by_name[wildcards.samplename]['paired'])
 	output:
 		jason_pruned = "meta/FASTP/{samplename}.json.pruned"
 	shell:
-		"python scripts/fastp_reporter.py {input.jason} {output.jason_pruned} --t {wildcards.samplename}"
+		"""
+		cp {input.jason} meta/FASTP/{wildcards.samplename}.json
+		python scripts/fastp_reporter.py {input.jason} {output.jason_pruned} --t {wildcards.samplename}
+		"""
 
 rule demand_FASTQ_analytics:	#forces a FASTP clean
 	input:
