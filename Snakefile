@@ -1,6 +1,6 @@
 configfile: 'config.yaml'
 
-#module load python/3.5.1 samtools freebayes vcftools bwa
+#module load python/3.5.1 samtools freebayes vcftools bwa bedtools
 
 sample_by_name = {c['name'] : c for c in config['data_sets']}
 ref_genome_by_name = { g['name'] : g for g in config['reference_genomes']}
@@ -71,7 +71,7 @@ rule FASTP_summarizer:
 	shell:
 		"""
 		cp {input.jason} meta/FASTP/{wildcards.samplename}.json
-		python scripts/fastp_reporter.py {input.jason} {output.jason_pruned} --t {wildcards.samplename}
+		python scripts/fastp_reporter.py {input.jason} {output.jason_pruned} -t {wildcards.samplename}
 		"""
 
 rule demand_FASTQ_analytics:	#forces a FASTP clean
@@ -118,6 +118,31 @@ rule bwa_uniq:
 		shell("samtools index {output.bam_out}")
 
 
+
+rule bam_reporter:
+	input:
+		bam_in = "mapped_reads/{sample}.vs_{ref_genome}.{aligner}.sort.bam"
+	output:
+		report_out = "meta/BAMs/{sample}.vs_{ref_genome}.{aligner}.summary"
+	run:
+		ref_genome_idx=ref_genome_by_name[wildcards.ref_genome]['fai']
+		shell("samtools idxstats {input.bam_in} > {input.bam_in}.idxstats")
+		shell("samtools flagstat {input.bam_in} > {input.bam_in}.flagstat")
+		shell("bedtools genomecov -max 1 -ibam {input.bam_in} -g {ref_genome_idx} > {input.bam_in}.genomcov")
+		shell("python scripts/bam_summarizer.py -f {input.bam_in}.flagstat -i {input.bam_in}.idxstats -g {input.bam_in}.genomcov -o {output.report_out} -t {wildcards.sample}")
+#change the -max flag as needed to set 
+
+rule demand_BAM_analytics:
+	input:
+		bam_reports = lambda wildcards: expand("meta/BAMs/{sample}.vs_{ref_genome}.{aligner}.summary", sample=sample_by_name.keys(), ref_genome=wildcards.ref_genome, aligner=wildcards.aligner)
+	output:
+		full_report = "meta/alignments.vs_{ref_genome}.{aligner}.summary"
+	shell:
+		"cat {input.bam_reports} > {output.full_report}"
+#	cat test.samtools.idxstats | sed \$d | awk '{print $1, $3/$2}' > per_contig_coverage_depth
+#	echo  $( cat test.samtools.idxstats |  sed \$d | cut -f 2 | paste -sd+ | bc) $(cat test.samtools.idxstats |  sed \$d | cut -f 3 | paste -sd+ | bc) | tr  " " "\t" | awk '{print "total\t"$1/$2}'
+
+
 rule joint_vcf_caller:
 	input:
 		bams_in = lambda wildcards: expand("mapped_reads/{sample}.vs_{ref_genome}.{aligner}.sort.bam", sample=sample_by_name.keys(), ref_genome=wildcards.ref_genome, aligner=wildcards.aligner),
@@ -130,6 +155,11 @@ rule joint_vcf_caller:
 	run:
 		ref_genome_file=ref_genome_by_name[wildcards.ref_genome]['path']
 		shell("freebayes {params.freebayes} -f {ref_genome_file} {input.bams_in} | vcftools --remove-indels --vcf - --recode --recode-INFO-all --stdout  > {output.joint_vcf}")
+
+
+## VCF summary report? eg, shared fraction of genome covered by x% of samples at mindepth?
+
+
 
 rule write_report:
 	input:
