@@ -1,0 +1,33 @@
+---
+title: "PopPsiSeq Summary"
+author: "Charlie Soeder"
+date: "11/14/2018"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library("yaml")
+library("plyr")
+library("tidyverse")
+
+# gotta set the working directory.....
+```
+
+## Introduction
+
+Explain motivation, overview of PsiSeq and PsiSeq2
+
+Population-based approach, rather than ancestral
+
+## Materials, Methods, Data, Software
+
+
+
+## Results
+
+## References
+

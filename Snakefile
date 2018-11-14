@@ -159,12 +159,20 @@ rule joint_vcf_caller:
 
 ## VCF summary report? eg, shared fraction of genome covered by x% of samples at mindepth?
 
-
+## benchmarking??
+#	https://snakemake.readthedocs.io/en/stable/snakefiles/rules.html#benchmark-rules
 
 rule write_report:
 	input:
 		sequenced_reads_summary=["meta/sequenced_reads.dat"],
+		alignment_summaries = expand("meta/alignments.vs_{ref_genome}.{aligner}.summary", ref_genome=['droSim1', 'droSec1'], aligner=['bwa','bwaUniq']),
 	output:
 		pdf_out="thingy.pdf"
 	run:
-		"touch {output.pdf_out}"
+		pandoc_path="/nas/longleaf/apps/rstudio/1.0.136/bin/pandoc"
+		pwd = shell("pwd")
+		shell(""" R -e "setwd('{pwd}')" -e Sys.setenv"(RSTUDIO_PANDOC='{pandoc_path}')" -e  rmarkdown::render"('scripts/PopPsiSeq_summary.Rmd',output_file='{output.pdf_out}')"  """)
+#pandoc_path="/nas/longleaf/apps/rstudio/1.0.136/bin/pandoc"
+#R -e Sys.setenv"(RSTUDIO_PANDOC='$pandoc_path')" -e  rmarkdown::render"('$markDown_in',output_file='$pdf_Out')"
+#R -e "setwd('/proj/cdjones_lab/csoeder/PopPsiSeq')" -e Sys.setenv"(RSTUDIO_PANDOC='$pandoc_path')" -e  rmarkdown::render"('scripts/PopPsiSeq_summary.Rmd',output_file='test.pdf')"
+
