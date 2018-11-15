@@ -29,6 +29,8 @@ rule fastp_clean_sample_se:
 		fileOut = ["{pathprefix}/{samplename}.clean.R0.fastq"],
 		jason = "{pathprefix}/{samplename}.False.json"
 	params:
+		runmem_gb=8,
+		runtime="3:00:00"
 		#--trim_front1 and -t, --trim_tail1
 		#--trim_front2 and -T, --trim_tail2. 
 		common_params = "--json {pathprefix}/{samplename}.False.json",# --html meta/FASTP/{samplename}.html", 
@@ -44,6 +46,8 @@ rule fastp_clean_sample_pe:
 		fileOut = ["{pathprefix}/{samplename}.clean.R1.fastq","{pathprefix}/{samplename}.clean.R2.fastq"],
 		jason = "{pathprefix}/{samplename}.True.json"
 	params:
+		runmem_gb=8,
+		runtime="3:00:00"
 		#--trim_front1 and -t, --trim_tail1
 		#--trim_front2 and -T, --trim_tail2. 
 		common_params = "--json {pathprefix}/{samplename}.True.json",# --html meta/FASTP/{samplename}.html", 
@@ -68,6 +72,9 @@ rule FASTP_summarizer:
 		jason = lambda wildcards: expand("{path}{samp}.{pairt}.json", path=sample_by_name[wildcards.samplename]['path'], samp = wildcards.samplename, pairt = sample_by_name[wildcards.samplename]['paired'])
 	output:
 		jason_pruned = "meta/FASTP/{samplename}.json.pruned"
+	params:
+		runmem_gb=1,
+		runtime="5:00"
 	shell:
 		"""
 		cp {input.jason} meta/FASTP/{wildcards.samplename}.json
@@ -79,6 +86,9 @@ rule demand_FASTQ_analytics:	#forces a FASTP clean
 		jasons_in = expand("meta/FASTP/{samplename}.json.pruned", samplename = sample_by_name.keys())
 	output:
 		summary = "meta/sequenced_reads.dat"
+	params:
+		runmem_gb=1,
+		runtime="1:00"
 	run:
 		"cat {input.jasons_in} > {output.summary}"
 
@@ -90,6 +100,9 @@ rule bwa_align:
 		ref_genome_file = lambda wildcards: ref_genome_by_name[wildcards.ref_genome]['path'],
 	output:
 		bam_out = "mapped_reads/{sample}.vs_{ref_genome}.bwa.sort.bam",
+	params:
+		runmem_gb=32,
+		runtime="12:00:00"
 	run:
 		shell("bwa aln {input.ref_genome_file} {input.reads_in[0]} > {input.reads_in[0]}.sai ")
 		if sample_by_name[wildcards.sample]['paired']:
@@ -110,6 +123,8 @@ rule bwa_uniq:
 	params:
 		quality="-q 20 -F 0x0100 -F 0x0200 -F 0x0300 -F 0x04",
 		uniqueness="XT:A:U.*X0:i:1.*X1:i:0",
+		runmem_gb=16,
+		runtime="6:00:00"
 	run:
 		ref_genome_file=ref_genome_by_name[wildcards.ref_genome]['path']
 		#original; no dedupe
@@ -124,6 +139,9 @@ rule bam_reporter:
 		bam_in = "mapped_reads/{sample}.vs_{ref_genome}.{aligner}.sort.bam"
 	output:
 		report_out = "meta/BAMs/{sample}.vs_{ref_genome}.{aligner}.summary"
+	params:
+		runmem_gb=8,
+		runtime="4:00:00"
 	run:
 		ref_genome_idx=ref_genome_by_name[wildcards.ref_genome]['fai']
 		shell("samtools idxstats {input.bam_in} > {input.bam_in}.idxstats")
@@ -137,6 +155,9 @@ rule demand_BAM_analytics:
 		bam_reports = lambda wildcards: expand("meta/BAMs/{sample}.vs_{ref_genome}.{aligner}.summary", sample=sample_by_name.keys(), ref_genome=wildcards.ref_genome, aligner=wildcards.aligner)
 	output:
 		full_report = "meta/alignments.vs_{ref_genome}.{aligner}.summary"
+	params:
+		runmem_gb=8,
+		runtime="12:00:00"
 	shell:
 		"cat {input.bam_reports} > {output.full_report}"
 #	cat test.samtools.idxstats | sed \$d | awk '{print $1, $3/$2}' > per_contig_coverage_depth
@@ -168,6 +189,9 @@ rule write_report:
 		alignment_summaries = expand("meta/alignments.vs_{ref_genome}.{aligner}.summary", ref_genome=['droSim1', 'droSec1'], aligner=['bwa','bwaUniq']),
 	output:
 		pdf_out="thingy.pdf"
+	params:
+		runmem_gb=8,
+		runtime="1:00:00"
 	run:
 		pandoc_path="/nas/longleaf/apps/rstudio/1.0.136/bin/pandoc"
 		pwd = shell("pwd")
