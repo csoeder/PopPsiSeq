@@ -30,11 +30,13 @@ rule fastp_clean_sample_se:
 		jason = "{pathprefix}/{samplename}.False.json"
 	params:
 		runmem_gb=8,
-		runtime="3:00:00"
+		runtime="3:00:00",
 		#--trim_front1 and -t, --trim_tail1
 		#--trim_front2 and -T, --trim_tail2. 
 		common_params = "--json {pathprefix}/{samplename}.False.json",# --html meta/FASTP/{samplename}.html", 
 		se_params = "",
+	message:
+		"FASTP QA/QC on single-ended reads ({wildcards.samplename}) in progress.... "
 	shell:
 		"/nas/longleaf/home/csoeder/modules/fastp/fastp {params.common_params} {params.se_params} --in1 {input.fileIn[0]} --out1 {output.fileOut[0]}"
 
@@ -47,11 +49,13 @@ rule fastp_clean_sample_pe:
 		jason = "{pathprefix}/{samplename}.True.json"
 	params:
 		runmem_gb=8,
-		runtime="3:00:00"
+		runtime="3:00:00",
 		#--trim_front1 and -t, --trim_tail1
 		#--trim_front2 and -T, --trim_tail2. 
 		common_params = "--json {pathprefix}/{samplename}.True.json",# --html meta/FASTP/{samplename}.html", 
 		pe_params = "--detect_adapter_for_pe --correction",
+	message:
+		"FASTP QA/QC on paired-ended reads ({wildcards.samplename}) in progress.... "
 	shell:
 		"/nas/longleaf/home/csoeder/modules/fastp/fastp {params.common_params} {params.pe_params} --in1 {input.fileIn[0]} --out1 {output.fileOut[0]} --in2 {input.fileIn[1]} --out2 {output.fileOut[1]}"
 
@@ -74,11 +78,13 @@ rule FASTP_summarizer:
 		jason_pruned = "meta/FASTP/{samplename}.json.pruned"
 	params:
 		runmem_gb=1,
-		runtime="5:00"
+		runtime="5:00",
+	message:
+		"Summarizing reads for sample ({wildcards.samplename}) .... "	
 	shell:
 		"""
 		cp {input.jason} meta/FASTP/{wildcards.samplename}.json
-		python scripts/fastp_reporter.py {input.jason} {output.jason_pruned} -t {wildcards.samplename}
+		python3 scripts/fastp_reporter.py {input.jason} {output.jason_pruned} -t {wildcards.samplename}
 		"""
 
 rule demand_FASTQ_analytics:	#forces a FASTP clean
@@ -88,7 +94,9 @@ rule demand_FASTQ_analytics:	#forces a FASTP clean
 		summary = "meta/sequenced_reads.dat"
 	params:
 		runmem_gb=1,
-		runtime="1:00"
+		runtime="1:00",
+	message:
+		"Collecting read summaries for all samples ...."
 	run:
 		"cat {input.jasons_in} > {output.summary}"
 
@@ -102,7 +110,9 @@ rule bwa_align:
 		bam_out = "mapped_reads/{sample}.vs_{ref_genome}.bwa.sort.bam",
 	params:
 		runmem_gb=32,
-		runtime="12:00:00"
+		runtime="12:00:00",
+	message:
+		"aligning reads from {wildcards.samplename} to reference_genome {wildcards.ref_genome} .... "
 	run:
 		shell("bwa aln {input.ref_genome_file} {input.reads_in[0]} > {input.reads_in[0]}.sai ")
 		if sample_by_name[wildcards.sample]['paired']:
@@ -124,7 +134,9 @@ rule bwa_uniq:
 		quality="-q 20 -F 0x0100 -F 0x0200 -F 0x0300 -F 0x04",
 		uniqueness="XT:A:U.*X0:i:1.*X1:i:0",
 		runmem_gb=16,
-		runtime="6:00:00"
+		runtime="6:00:00",
+	message:
+		"filtering alignment of {wildcards.sample} to {wildcards.ref_genome} for quality and mapping uniqueness.... "	
 	run:
 		ref_genome_file=ref_genome_by_name[wildcards.ref_genome]['path']
 		#original; no dedupe
@@ -141,13 +153,15 @@ rule bam_reporter:
 		report_out = "meta/BAMs/{sample}.vs_{ref_genome}.{aligner}.summary"
 	params:
 		runmem_gb=8,
-		runtime="4:00:00"
+		runtime="4:00:00",
+	message:
+		"Collecting metadata for the {wildcards.aligner} alignment of {wildcards.sample} to {wildcards.ref_genome}.... "
 	run:
 		ref_genome_idx=ref_genome_by_name[wildcards.ref_genome]['fai']
 		shell("samtools idxstats {input.bam_in} > {input.bam_in}.idxstats")
 		shell("samtools flagstat {input.bam_in} > {input.bam_in}.flagstat")
 		shell("bedtools genomecov -max 1 -ibam {input.bam_in} -g {ref_genome_idx} > {input.bam_in}.genomcov")
-		shell("python scripts/bam_summarizer.py -f {input.bam_in}.flagstat -i {input.bam_in}.idxstats -g {input.bam_in}.genomcov -o {output.report_out} -t {wildcards.sample}")
+		shell("python3 scripts/bam_summarizer.py -f {input.bam_in}.flagstat -i {input.bam_in}.idxstats -g {input.bam_in}.genomcov -o {output.report_out} -t {wildcards.sample}")
 #change the -max flag as needed to set 
 
 rule demand_BAM_analytics:
@@ -156,8 +170,10 @@ rule demand_BAM_analytics:
 	output:
 		full_report = "meta/alignments.vs_{ref_genome}.{aligner}.summary"
 	params:
-		runmem_gb=8,
-		runtime="12:00:00"
+		runmem_gb=1,
+		runtime="1:00",
+	message:
+		"collecting all alignment metadata.... "
 	shell:
 		"cat {input.bam_reports} > {output.full_report}"
 #	cat test.samtools.idxstats | sed \$d | awk '{print $1, $3/$2}' > per_contig_coverage_depth
@@ -172,7 +188,9 @@ rule joint_vcf_caller:
 	params:
 		freebayes="--standard-filters",
 		runmem_gb=8,
-		runtime="12:00:00"
+		runtime="12:00:00",
+	message:
+		"Jointly calling variants from all samples mapped to {wildcards.ref_genome} with {wildcards.aligner}"
 	run:
 		ref_genome_file=ref_genome_by_name[wildcards.ref_genome]['path']
 		shell("freebayes {params.freebayes} -f {ref_genome_file} {input.bams_in} | vcftools --remove-indels --vcf - --recode --recode-INFO-all --stdout  > {output.joint_vcf}")
@@ -191,7 +209,9 @@ rule write_report:
 		pdf_out="thingy.pdf"
 	params:
 		runmem_gb=8,
-		runtime="1:00:00"
+		runtime="1:00:00",
+	message:
+		"writing up the results.... "
 	run:
 		pandoc_path="/nas/longleaf/apps/rstudio/1.0.136/bin/pandoc"
 		pwd = shell("pwd")
