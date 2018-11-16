@@ -97,7 +97,7 @@ rule demand_FASTQ_analytics:	#forces a FASTP clean
 		runtime="1:00",
 	message:
 		"Collecting read summaries for all samples ...."
-	run:
+	shell:
 		"cat {input.jasons_in} > {output.summary}"
 
 

@@ -5,53 +5,62 @@ data_sets:
       experimental: control
       readsfile1: SRR5860570_1.clean.fastq
       readsfile2: SRR5860570_2.clean.fastq
+      source: NCBI
     - name: 10A
       paired: True
       path: FASTQs/2013/10A/
       experimental: selection
       readsfile1: 10A.R1.fastq
       readsfile2: 10A.R2.fastq
+      source: EarlyJones2013
     - name: SRR303333
       paired: False
       path: FASTQs/2011/SRR303333/
       experimental: selection
       readsfile: SRR303333.fq
+      source: EarlyJones2011
     - name: SECH1
       paired: True
       path: FASTQs/matuteSec/SECH1/
       species: drosophila sechellia
       readsfile1: SECH_1_1.fq
       readsfile2: SECH_1_2.fq
+      source: matute
     - name: SECH2
       paired: True
       path: FASTQs/matuteSec/SECH2/
       species: drosophila sechellia
       readsfile1: SECH_2_1.fq
       readsfile2: SECH_2_2.fq
+      source: matute
     - name: SECH3
       paired: True
       path: FASTQs/matuteSec/SECH3/
       species: drosophila sechellia
       readsfile1: SECH_3_1.fq
       readsfile2: SECH_3_2.fq
+      source: matute
     - name: MD06m11d04y2010
       paired: True
       path: FASTQs/matuteSim/MD06m11d04y2010/
       species: drosophila simulans
       readsfile1: MD06_11_04_2010_54_R1_001.fastq
       readsfile2: MD06_11_04_2010_54_R2_001.fastq
+      source: matute
     - name: MD199m12d10y2010
       paired: True
       path: FASTQs/matuteSim/MD199m12d10y2010/
       species: drosophila simulans
       readsfile1: MD199_12_10_2010_75_R1_001.fastq
       readsfile2: MD199_12_10_2010_75_R2_001.fastq
+      source: matute
     - name: MD73m11d04y2010
       paired: True
       path: FASTQs/matuteSim/MD73m11d04y2010/
       species: drosophila simulans
       readsfile1: MD73_11_04_2010_54_R1_001.fastq
       readsfile2: MD73_11_04_2010_54_R2_001.fastq
+      source: matute
 
 
 

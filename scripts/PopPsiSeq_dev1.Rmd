@@ -1,0 +1,47 @@
+---
+title: "PopPsiSeq Dev1"
+author: "Charlie Soeder"
+date: "11/14/2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(root.dir = '/Users/csoeder/Research/PSIseq/PopPsiSeq/')
+knitr::opts_knit$set(root.dir='/Users/csoeder/Research/PSIseq/PopPsiSeq/')
+library("tidyverse")
+library("knitr")
+
+
+```
+
+## 16 Nov 2018
+```{r include=FALSE}
+library("yaml")
+getwd()
+trammel <- read_yaml("config.yaml")
+data_sets.df <- plyr::ldply(trammel$data_sets, data.frame)
+data_sets.df$name <- as.factor(data_sets.df$name)
+data_sets.df$paired<- as.factor(data_sets.df$paired)
+data_sets.df$experimental<- as.factor(data_sets.df$experimental)
+data_sets.df$species<- as.factor(data_sets.df$species)
+data_sets.df$source<- as.factor(data_sets.df$source)
+```
+
+
+Population-wide sample count by species:
+
+```{r echo=FALSE, results='asis'}
+data_sets.df %>%  filter( !is.na(species)) %>% group_by(species) %>% summarise(sample_count=n()) %>% kable(caption="Number of Sequenced Samples per Species")
+```
+
+
+```{r echo=FALSE}
+#data_sets.df %>%  filter( !is.na(species)) %>% group_by(species) %>% summarise(sample_count=n())
+```
+
+
+
+
+
+
