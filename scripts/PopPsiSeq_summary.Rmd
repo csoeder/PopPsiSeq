@@ -5,14 +5,16 @@ date: "11/14/2018"
 output:
   pdf_document: default
   html_document: default
+bibliography: references.bib
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-
-library("yaml")
-library("plyr")
+knitr::opts_chunk$set(root.dir = '/Users/csoeder/Research/PSIseq/PopPsiSeq/')
+knitr::opts_knit$set(root.dir='/Users/csoeder/Research/PSIseq/PopPsiSeq/')
 library("tidyverse")
+library("knitr")
+library("yaml")
 
 # gotta set the working directory.....
 ```
@@ -25,7 +27,142 @@ Population-based approach, rather than ancestral
 
 ## Materials, Methods, Data, Software
 
-Raw reads were 
+### Sequenced Reads
+
+```{r include=FALSE}
+library("yaml")
+
+trammel <- read_yaml("config.yaml")
+data_sets.df <- plyr::ldply(trammel$data_sets, data.frame)
+data_sets.df$name <- as.factor(data_sets.df$name)
+data_sets.df$paired<- as.factor(data_sets.df$paired)
+data_sets.df$experimental<- as.factor(data_sets.df$experimental)
+data_sets.df$species<- as.factor(data_sets.df$species)
+data_sets.df$source<- as.factor(data_sets.df$source)
+```
+
+
+A backcross and introgression experiment was performed, in which simulans females were mated with sechellia males, and the hybrid offspring were selected for avoidance of morinda odorants. The offspring were sequenced after 15 rounds of backcrossing and introgression [@Earley2011]. One sample was sequenced in this experiment; a follow-up experiment generated three more samples with two replicates each. As a control, several wild-type sechellia sequences were downloaded from NCBI:
+
+```{r echo=FALSE}
+data_sets.df %>%  filter( !is.na(experimental)) %>%  select(c(name, paired, experimental, source)) %>%  arrange(experimental, desc(name)) %>% kable(caption="Sequenced Experimental Samples")
+```
+
+
+For population-wide data, wild D. simulans and D. sechellia flies were captured and sequenced by Daniel Matute:
+
+```{r echo=FALSE, results='asis'}
+data_sets.df %>%  filter( !is.na(species)) %>% group_by(species) %>% summarise(sample_count=n()) %>% kable(caption="Number of Sequenced Samples per Species")
+```
+
+#### Pre-processing
+
+```{r echo=FALSE}
+fastp_summary <- read_delim("meta/sequenced_reads.dat", "\t", escape_double = FALSE, col_names = FALSE, trim_ws = TRUE)
+names(fastp_summary ) <- c("name","type","measure","value")
+fastp_summary$name <- as.factor(fastp_summary$name)
+fastp_summary$type <- as.factor(fastp_summary$type)
+fastp_summary$measure <- as.factor(fastp_summary$measure)
+```
+
+These reads were preprocessed with FASTP [@Chen2018] for quality control and analytics. 
+
+```{r echo=FALSE}
+
+filtration_stats <- inner_join(fastp_summary %>%  filter(type=="prefiltered" | type == 'postfiltered'), data_sets.df, by=c("name"="name"))
+filtration_stats$type <- factor(filtration_stats$type, levels=c("prefiltered", "postfiltered"))
+
+
+```
+
+
+Starting FASTQ files contained a total of  $`r sum( filtration_stats %>% filter(type =='prefiltered') %>%  filter(measure=='total_reads') %>% select(value) )`$ reads; after QC, this dropped to $`r sum( filtration_stats %>% filter(type =='postfiltered') %>%  filter(measure=='total_reads') %>% select(value) )`$. 
+
+```{r echo=FALSE}
+pre_post_counts <- filtration_stats %>% filter(measure=='total_reads') %>%  group_by(type)  %>%  summarise(minimum = min(value), average=mean(value) , maximum = max(value)) 
+retention_percent <- filtration_stats %>% filter(measure=='total_reads') %>% select(c(name,type,value)) %>%  spread(type,value) %>% mutate(retention=100*postfiltered/prefiltered) %>%  summarise(type='percent retention', minimum = min(retention), average=mean(retention) , maximum = max(retention)) 
+rbind(pre_post_counts, retention_percent) %>% kable()
+```
+
+Filtration also increased the read quality, as seen in the increase in the fraction of reads with an average quality score > 30:
+
+```{r echo=FALSE}
+ggplot(filtration_stats %>% filter(measure == "q30_rate")) + geom_line(aes(group=name, x=type,y=value)) +  geom_point(aes(x=type, y = value)) 
+
+```
+
+Duplicate reads were also detected; these will be filtered during alignment:
+
+```{r echo=FALSE}
+dupe_stats <- inner_join(fastp_summary %>% filter(type=='duplication' & measure =='rate') %>%  mutate(percent=value*100) %>% select(c(name,percent)), data_sets.df, by=c("name"="name"))
+```
+```{r echo=FALSE}
+dupe_stats%>%  summarise(minimum = min(percent), average=mean(percent), median=median(percent) , maximum = max(percent)) %>% kable(caption="Percentage Duplication")
+```
+```{r echo=FALSE}
+ggplot(dupe_stats) + geom_histogram(aes(x=percent))
+```
+
+
+
+### Mapped Reads
+
+Reads were first mapped to a reference genome using the BWA SAMPE/SE algorithm. Then, the alignment file was filtered for uniqueness (ie, a read must be aligned optimally with no alternative or runner-up hits, "XT:A:U.*X0:i:1.*X1:i:0"), mapping/sequencing quality ("-q 20 -F 0x0100 -F 0x0200 -F 0x0300 -F 0x04"), and deduplication. 
+
+```{r echo=FALSE, include=FALSE}
+vs_droSim1.bwa <- read_delim("meta/alignments.vs_droSim1.bwa.summary", "\t", escape_double = FALSE, col_names = FALSE, trim_ws = TRUE)
+names(vs_droSim1.bwa) <- c("sample","measure","value")
+vs_droSim1.bwa$aligner <- as.factor("bwa")
+vs_droSim1.bwa$sample <- as.factor(vs_droSim1.bwa$sample)
+vs_droSim1.bwa$measure <- as.factor(vs_droSim1.bwa$measure)
+
+
+vs_droSim1.bwaUniq <- read_delim("meta/alignments.vs_droSim1.bwaUniq.summary", "\t", escape_double = FALSE, col_names = FALSE, trim_ws = TRUE)
+names(vs_droSim1.bwaUniq) <- c("sample","measure","value")
+vs_droSim1.bwaUniq$aligner <- as.factor("bwaUniq")
+vs_droSim1.bwaUniq$sample <- as.factor(vs_droSim1.bwaUniq$sample)
+vs_droSim1.bwaUniq$measure <- as.factor(vs_droSim1.bwaUniq$measure)
+```
+
+```{r echo=FALSE}
+
+#vs_droSim1.bwa %>%  filter(measure=='total_read_count' | measure == 'total_mapped_count')
+#vs_droSim1.bwaUniq %>%  filter( measure == 'total_mapped_count') %>% mutate(measure='filtered_mapped_count')
+
+
+
+
+before_After.counts <- rbind(vs_droSim1.bwa %>%  filter(measure=='total_read_count' | measure == 'total_mapped_count'), vs_droSim1.bwaUniq %>%  filter( measure == 'total_mapped_count') %>% mutate(measure='filtered_mapped_count'))
+
+before_After.counts$measure <- factor(before_After.counts$measure, levels = c('total_read_count','total_mapped_count','filtered_mapped_count'))
+
+ggplot(before_After.counts) + geom_line(aes(group=sample, x=measure,y=value)) + geom_line(aes(group=sample, x=measure,y=value)) + geom_point(aes(x=measure, y=value, group=sample,color=sample)) + labs(title="Read Counts by Processing Step: Raw, Mapped, Filtered", x="", y="Number Reads" ) + scale_y_log10()
+
+
+
+```
+
+```{r echo=FALSE}
+before_After.counts.aug <- before_After.counts %>% select(-c(aligner)) %>% spread(measure, value) %>%  mutate(mapping_retention=total_mapped_count/total_read_count, filter_retention = filtered_mapped_count/total_mapped_count)
+
+
+before_After.counts$measure <- factor(before_After.counts$measure, levels = c('total_read_count','total_mapped_count','filtered_mapped_count'))
+
+before_After.counts.aug %>% gather(total_read_count:filtered_mapped_count, key="measure", value="value") %>%  group_by(measure) %>% summarise(minimum = min(value), average=mean(value), median = median(value), maximum = max(value)) %>% kable(caption="Read Counts During Alignment & Filtration")
+
+```
+
+The fraction of reads retained at each point:
+
+```{r echo=FALSE}
+
+
+before_After.counts.aug %>% gather(mapping_retention:filter_retention, key="measure", value="value") %>%  group_by(measure) %>% summarise(minimum = min(100*value), average=mean(100*value), median = median(100*value), maximum = max(100*value)) %>% kable(caption="Percentage of Reads Retained at Each Step")
+
+```
+
+
+
 
 
 

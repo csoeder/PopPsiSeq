@@ -109,10 +109,10 @@ rule bwa_align:
 	output:
 		bam_out = "mapped_reads/{sample}.vs_{ref_genome}.bwa.sort.bam",
 	params:
-		runmem_gb=32,
+		runmem_gb=64,
 		runtime="12:00:00",
 	message:
-		"aligning reads from {wildcards.samplename} to reference_genome {wildcards.ref_genome} .... "
+		"aligning reads from {wildcards.sample} to reference_genome {wildcards.ref_genome} .... "
 	run:
 		shell("bwa aln {input.ref_genome_file} {input.reads_in[0]} > {input.reads_in[0]}.sai ")
 		if sample_by_name[wildcards.sample]['paired']:
