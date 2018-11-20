@@ -2,7 +2,9 @@
 title: "PopPsiSeq Dev1"
 author: "Charlie Soeder"
 date: "11/14/2018"
-output: html_document
+output:
+  pdf_document: default
+  html_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -152,3 +154,68 @@ before_After.cov <- inner_join( vs_droSim1.bwa %>%  filter(measure=='avg_depth' 
 ggplot(before_After.counts) + geom_line(aes(group=sample, x=measure,y=value)) + geom_line(aes(group=sample, x=measure,y=value)) + geom_point(aes(x=measure, y=value, group=sample,color=sample)) + labs(title="Read Counts by Processing Step: Raw, Mapped, Filtered", x="", y="Number Reads" ) + scale_y_log10()
 
 ```
+
+
+## 20 Nov 2018
+
+Depth of coverage:
+
+```{r echo=FALSE}
+
+#before_After.cov %>% gather(avg_depth.before:breadth_retention, key=measure, value=value)
+
+covstats.dpth <- before_After.cov %>% gather(avg_depth.before, key=measure, value=value) %>% summarise(step="pre-filtration depth",minimum = min(value), average=mean(value), median = median(value), maximum = max(value))
+
+covstats.dpth <- rbind(covstats.dpth, before_After.cov %>% gather(avg_depth.after, key=measure, value=value)  %>% summarise(step="post-filtration depth",minimum = min(value), average=mean(value), median = median(value), maximum = max(value)))
+
+
+covstats.dpth <- rbind(covstats.dpth, before_After.cov %>% gather(depth_retention, key=measure, value=value)  %>% summarise(step="depth retention",minimum = min(value), average=mean(value), median = median(value), maximum = max(value)))
+
+covstats.dpth %>% kable(caption="Average Depth of Coverage for Raw and Filtered Alignments")
+
+
+##report by subdivision:
+before_After.cov.meta <- inner_join(before_After.cov, data_sets.df, by=c('sample'='name'))
+before_After.cov.meta %>% group_by(species)  %>% gather(avg_depth.before, key=measure, value=value) %>% summarise(step="pre-filtration depth",minimum = min(value), average=mean(value), median = median(value), maximum = max(value)) 
+
+
+```
+
+```{r echo=FALSE}
+
+before_After.cov.gathered.meta <- inner_join(before_After.cov %>%  gather(avg_depth.before:breadth_retention, key="measure", value="value") , data_sets.df, by=c("sample"="name") ) 
+
+ggplot(before_After.cov.gathered.meta %>% filter(measure== "avg_depth.before" | measure== "avg_depth.after") %>% mutate(measure=factor(measure, levels=c("avg_depth.before" , "avg_depth.after" )))) + geom_line(aes(group=sample, x=measure,y=value, color=experimental)) + geom_point(aes(x=measure, y=value, group=sample)) + labs(title="Depth Of Coverage for Raw and Filtered Alignments", x="", y="Reads Per BP, Genome-Wide" )
+
+
+```
+
+
+
+```{r echo=FALSE}
+
+covstats.brth <- before_After.cov %>% gather(total_breadth.before, key=measure, value=value) %>% summarise(step="pre-filtration breadth",minimum = 100*min(value), average=100*mean(value), median = 100*median(value), maximum = 100*max(value))
+
+covstats.brth <- rbind(covstats.brth, before_After.cov %>% gather(total_breadth.after, key=measure, value=value)  %>% summarise(step="post-filtration breadth",minimum = 100*min(value), average=100*mean(value), median = 100*median(value), maximum = 100*max(value)))
+
+
+covstats.brth <- rbind(covstats.brth, before_After.cov %>% gather(breadth_retention, key=measure, value=value)  %>% summarise(step="breadth retention",minimum = 100*min(value), average=100*mean(value), median = 100*median(value), maximum = 100*max(value)))
+
+covstats.brth %>% kable(caption="Breadth of Coverage Statistics for Raw and Filtered Alignments", digits=1)
+
+```
+
+
+
+
+```{r echo=FALSE}
+
+
+ggplot(before_After.cov.gathered.meta %>% filter(measure== "total_breadth.before" | measure== "total_breadth.after") %>% mutate(measure=factor(measure, levels=c("total_breadth.before" , "total_breadth.after" )))) + geom_line(aes(group=sample, x=measure,y=value, color=experimental)) + geom_point(aes(x=measure, y=value, group=sample)) + labs(title="Breadth Of Coverage for Raw and Filtered Alignments", x="", y="Percentage of Genome Mapped To" )
+```
+
+
+
+
+
+

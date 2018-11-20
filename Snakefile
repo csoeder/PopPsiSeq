@@ -161,8 +161,12 @@ rule bam_reporter:
 		shell("samtools idxstats {input.bam_in} > {input.bam_in}.idxstats")
 		shell("samtools flagstat {input.bam_in} > {input.bam_in}.flagstat")
 		shell("bedtools genomecov -max 1 -ibam {input.bam_in} -g {ref_genome_idx} > {input.bam_in}.genomcov")
-		shell("python3 scripts/bam_summarizer.py -f {input.bam_in}.flagstat -i {input.bam_in}.idxstats -g {input.bam_in}.genomcov -o {output.report_out} -t {wildcards.sample}")
+		shell("""samtools depth -a {input.bam_in} | awk '{sum+=$3; sumsq+=$3*$3} END { print "average_depth\t",sum/NR; print "std_depth\t",sqrt(sumsq/NR - (sum/NR)**2)}' > {input.bam_in}.dpthStats""")
+		#https://www.biostars.org/p/5165/
+		#save the depth file and offload the statistics to the bam_summarizer script??
+		shell("python3 scripts/bam_summarizer.py -f {input.bam_in}.flagstat -i {input.bam_in}.idxstats -g {input.bam_in}.genomcov -d {input.bam_in}.dpthStats -o {output.report_out} -t {wildcards.sample}")
 #change the -max flag as needed to set 
+
 
 rule demand_BAM_analytics:
 	input:

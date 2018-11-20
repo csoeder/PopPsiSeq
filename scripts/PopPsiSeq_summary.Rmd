@@ -1,9 +1,12 @@
 ---
 title: "PopPsiSeq Summary"
 author: "Charlie Soeder"
-date: "11/14/2018"
+date: "11/20/2018"
 output:
-  pdf_document: default
+  pdf_document:
+    toc: true
+    toc_depth: 5
+    number_sections: true
   html_document: default
 bibliography: references.bib
 ---
@@ -19,15 +22,15 @@ library("yaml")
 # gotta set the working directory.....
 ```
 
-## Introduction
+# Introduction
 
 Explain motivation, overview of PsiSeq and PsiSeq2
 
 Population-based approach, rather than ancestral
 
-## Materials, Methods, Data, Software
+# Materials, Methods, Data, Software
 
-### Sequenced Reads
+## Sequenced Reads
 
 ```{r include=FALSE}
 library("yaml")
@@ -55,9 +58,9 @@ For population-wide data, wild D. simulans and D. sechellia flies were captured 
 data_sets.df %>%  filter( !is.na(species)) %>% group_by(species) %>% summarise(sample_count=n()) %>% kable(caption="Number of Sequenced Samples per Species")
 ```
 
-#### Pre-processing
+### Pre-processing
 
-```{r echo=FALSE}
+```{r echo=FALSE, include=FALSE}
 fastp_summary <- read_delim("meta/sequenced_reads.dat", "\t", escape_double = FALSE, col_names = FALSE, trim_ws = TRUE)
 names(fastp_summary ) <- c("name","type","measure","value")
 fastp_summary$name <- as.factor(fastp_summary$name)
@@ -65,15 +68,12 @@ fastp_summary$type <- as.factor(fastp_summary$type)
 fastp_summary$measure <- as.factor(fastp_summary$measure)
 ```
 
-These reads were preprocessed with FASTP [@Chen2018] for quality control and analytics. 
-
-```{r echo=FALSE}
-
+```{r echo=FALSE, include=FALSE}
 filtration_stats <- inner_join(fastp_summary %>%  filter(type=="prefiltered" | type == 'postfiltered'), data_sets.df, by=c("name"="name"))
 filtration_stats$type <- factor(filtration_stats$type, levels=c("prefiltered", "postfiltered"))
-
-
 ```
+
+These reads were preprocessed with FASTP [@Chen2018] for quality control and analytics. 
 
 
 Starting FASTQ files contained a total of  $`r sum( filtration_stats %>% filter(type =='prefiltered') %>%  filter(measure=='total_reads') %>% select(value) )`$ reads; after QC, this dropped to $`r sum( filtration_stats %>% filter(type =='postfiltered') %>%  filter(measure=='total_reads') %>% select(value) )`$. 
@@ -93,19 +93,19 @@ ggplot(filtration_stats %>% filter(measure == "q30_rate")) + geom_line(aes(group
 
 Duplicate reads were also detected; these will be filtered during alignment:
 
-```{r echo=FALSE}
+```{r echo=FALSE, include=FALSE}
 dupe_stats <- inner_join(fastp_summary %>% filter(type=='duplication' & measure =='rate') %>%  mutate(percent=value*100) %>% select(c(name,percent)), data_sets.df, by=c("name"="name"))
 ```
 ```{r echo=FALSE}
 dupe_stats%>%  summarise(minimum = min(percent), average=mean(percent), median=median(percent) , maximum = max(percent)) %>% kable(caption="Percentage Duplication")
 ```
 ```{r echo=FALSE}
-ggplot(dupe_stats) + geom_histogram(aes(x=percent))
+ggplot(dupe_stats) + geom_histogram(aes(x=percent), bins=15) + labs(title="Duplication Histogram", x="Read Duplication Rate (FASTP estimate)")
 ```
 
 
 
-### Mapped Reads
+## Mapped Reads
 
 Reads were first mapped to a reference genome using the BWA SAMPE/SE algorithm. Then, the alignment file was filtered for uniqueness (ie, a read must be aligned optimally with no alternative or runner-up hits, "XT:A:U.*X0:i:1.*X1:i:0"), mapping/sequencing quality ("-q 20 -F 0x0100 -F 0x0200 -F 0x0300 -F 0x04"), and deduplication. 
 
@@ -124,13 +124,9 @@ vs_droSim1.bwaUniq$sample <- as.factor(vs_droSim1.bwaUniq$sample)
 vs_droSim1.bwaUniq$measure <- as.factor(vs_droSim1.bwaUniq$measure)
 ```
 
+### Read & Alignment Quality
+
 ```{r echo=FALSE}
-
-#vs_droSim1.bwa %>%  filter(measure=='total_read_count' | measure == 'total_mapped_count')
-#vs_droSim1.bwaUniq %>%  filter( measure == 'total_mapped_count') %>% mutate(measure='filtered_mapped_count')
-
-
-
 
 before_After.counts <- rbind(vs_droSim1.bwa %>%  filter(measure=='total_read_count' | measure == 'total_mapped_count'), vs_droSim1.bwaUniq %>%  filter( measure == 'total_mapped_count') %>% mutate(measure='filtered_mapped_count'))
 
@@ -138,13 +134,10 @@ before_After.counts$measure <- factor(before_After.counts$measure, levels = c('t
 
 ggplot(before_After.counts) + geom_line(aes(group=sample, x=measure,y=value)) + geom_line(aes(group=sample, x=measure,y=value)) + geom_point(aes(x=measure, y=value, group=sample,color=sample)) + labs(title="Read Counts by Processing Step: Raw, Mapped, Filtered", x="", y="Number Reads" ) + scale_y_log10()
 
-
-
 ```
 
 ```{r echo=FALSE}
 before_After.counts.aug <- before_After.counts %>% select(-c(aligner)) %>% spread(measure, value) %>%  mutate(mapping_retention=total_mapped_count/total_read_count, filter_retention = filtered_mapped_count/total_mapped_count)
-
 
 before_After.counts$measure <- factor(before_After.counts$measure, levels = c('total_read_count','total_mapped_count','filtered_mapped_count'))
 
@@ -155,10 +148,65 @@ before_After.counts.aug %>% gather(total_read_count:filtered_mapped_count, key="
 The fraction of reads retained at each point:
 
 ```{r echo=FALSE}
-
-
 before_After.counts.aug %>% gather(mapping_retention:filter_retention, key="measure", value="value") %>%  group_by(measure) %>% summarise(minimum = min(100*value), average=mean(100*value), median = median(100*value), maximum = max(100*value)) %>% kable(caption="Percentage of Reads Retained at Each Step")
 
+```
+
+### Depth & Breadth of Coverage
+
+
+```{r echo=FALSE, include=FALSE}
+
+before_After.cov <- inner_join( vs_droSim1.bwa %>%  filter(measure=='avg_depth' | measure == 'total_breadth') %>% select(-c(aligner)) %>% spread(measure, value), vs_droSim1.bwaUniq %>%  filter(measure=='avg_depth' | measure == 'total_breadth') %>% select(-c(aligner)) %>% spread(measure, value), by='sample', suffix=c(".before",".after") ) %>%  mutate(depth_retention = avg_depth.after/avg_depth.before, breadth_retention=total_breadth.after/total_breadth.before)
+
+
+before_After.cov.gathered.meta <- inner_join(before_After.cov %>%  gather(avg_depth.before:breadth_retention, key="measure", value="value") , data_sets.df, by=c("sample"="name") ) 
+
+
+```
+
+Depth of coverage, ie, the genome-wide average number of mapped reads per base pair:
+
+```{r echo=FALSE}
+covstats.dpth <- before_After.cov %>% gather(avg_depth.before, key=measure, value=value) %>% summarise(step="pre-filtration depth",minimum = min(value), average=mean(value), median = median(value), maximum = max(value))
+
+covstats.dpth <- rbind(covstats.dpth, before_After.cov %>% gather(avg_depth.after, key=measure, value=value)  %>% summarise(step="post-filtration depth",minimum = min(value), average=mean(value), median = median(value), maximum = max(value)))
+
+
+covstats.dpth <- rbind(covstats.dpth, before_After.cov %>% gather(depth_retention, key=measure, value=value)  %>% summarise(step="depth retention percent",minimum = 100*min(value), average=100*mean(value), median = 100*median(value), maximum = 100*max(value)))
+
+covstats.dpth %>% kable(caption="Depth of Coverage Statistics for Raw and Filtered Alignments", digits=3 )
+```
+
+```{r echo=FALSE}
+
+ggplot(before_After.cov.gathered.meta %>% filter(measure== "avg_depth.before" | measure== "avg_depth.after") %>% mutate(measure=factor(measure, levels=c("avg_depth.before" , "avg_depth.after" )))) + geom_line(aes(group=sample, x=measure,y=value, color=experimental)) + geom_point(aes(x=measure, y=value, group=sample)) + labs(title="Depth Of Coverage for Raw and Filtered Alignments", x="", y="Reads Per BP, Genome-Wide" )
+
+```
+
+
+Breadth of coverage, ie, the percentage of the genome covered by at least one read:
+
+```{r echo=FALSE}
+
+covstats.brth <- before_After.cov %>% gather(total_breadth.before, key=measure, value=value) %>% summarise(step="pre-filtration breadth",minimum = 100*min(value), average=100*mean(value), median = 100*median(value), maximum = 100*max(value))
+
+covstats.brth <- rbind(covstats.brth, before_After.cov %>% gather(total_breadth.after, key=measure, value=value)  %>% summarise(step="post-filtration breadth",minimum = 100*min(value), average=100*mean(value), median = 100*median(value), maximum = 100*max(value)))
+
+
+covstats.brth <- rbind(covstats.brth, before_After.cov %>% gather(breadth_retention, key=measure, value=value)  %>% summarise(step="breadth retention",minimum = 100*min(value), average=100*mean(value), median = 100*median(value), maximum = 100*max(value)))
+
+covstats.brth %>% kable(caption="Breadth of Coverage Statistics for Raw and Filtered Alignments", digits=1)
+
+```
+
+
+
+
+```{r echo=FALSE}
+
+
+ggplot(before_After.cov.gathered.meta %>% filter(measure== "total_breadth.before" | measure== "total_breadth.after") %>% mutate(measure=factor(measure, levels=c("total_breadth.before" , "total_breadth.after" )))) + geom_line(aes(group=sample, x=measure,y=value, color=experimental)) + geom_point(aes(x=measure, y=value, group=sample)) + labs(title="Breadth Of Coverage for Raw and Filtered Alignments", x="", y="Percentage of Genome Mapped To" )
 ```
 
 
@@ -166,8 +214,13 @@ before_After.counts.aug %>% gather(mapping_retention:filter_retention, key="meas
 
 
 
+# Results
 
-## Results
-
-## References
-
+# References
+##Software
+```{r echo=FALSE}
+citation("tidyverse")
+citation("knitr")
+citation("yaml")
+```
+##Bibliography
