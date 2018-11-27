@@ -69,14 +69,17 @@ reference_genomes:
       species: drosophila simulans
       path: /proj/cdjones_lab/Genomics_Data_Commons/genomes/drosophila_simulans/droSim1.fa
       fai: /proj/cdjones_lab/Genomics_Data_Commons/genomes/drosophila_simulans/droSim1.fa.fai
+      source: UCSC Genome Browser
     - name: droSec1
       species: drosophila sechellia
       path: /proj/cdjones_lab/Genomics_Data_Commons/genomes/drosophila_sechellia/droSec1.fa
       fai: /proj/cdjones_lab/Genomics_Data_Commons/genomes/drosophila_sechellia/droSec1.fa.fai
+      source: UCSC Genome Browser
     - name: dm6
       species: drosophila melanogaster
       path: /proj/cdjones_lab/Genomics_Data_Commons/genomes/drosophila_melanogaster/dm6.fa
       fai: /proj/cdjones_lab/Genomics_Data_Commons/genomes/drosophila_melanogaster/dm6.fa.fai
+      source: UCSC Genome Browser
 
 
 lift_genomes:

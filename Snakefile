@@ -6,6 +6,7 @@ sample_by_name = {c['name'] : c for c in config['data_sets']}
 ref_genome_by_name = { g['name'] : g for g in config['reference_genomes']}
 
 
+
 def return_filename_by_sampname(sampname):
 	filenames = []
 	if sample_by_name[sampname]['paired']:
@@ -21,6 +22,28 @@ def return_file_relpath_by_sampname(wildcards):
 	filesin = return_filename_by_sampname(sampname)
 	pathsout = ["".join([pathprefix, fq]) for fq in filesin]
 	return pathsout
+
+
+rule reference_genome_reporter:
+	input:
+		fai_in = lambda wildcards: ref_genome_by_name[wildcards.ref_gen]['fai'],
+	output:
+		report_out = "meta/reference_genomes/{ref_gen}.fai.report"
+	shell:
+		"""
+		mkdir -p meta/reference_genomes/;
+		awk '{sum+=$2} END { print "number_contigs\t",NR; print "number_bases\t",sum}' | sed -e 's/^/{wildcards.ref_gen}\t/g' > {output.report_out};
+		"""
+
+rule demand_reference_genome_summary:
+	input:
+		refgen_reports = lambda wildcards: expand("meta/reference_genomes/{ref_gen}.fai.report", ref_gen=ref_genome_by_name.keys())
+	output:
+		refgen_summary = "meta/reference_genomes.summary"
+	shell:
+		"cat {input.refgen_reports} > {output.refgen_summary}"
+
+
 
 rule fastp_clean_sample_se:
 	input:
@@ -207,6 +230,7 @@ rule joint_vcf_caller:
 
 rule write_report:
 	input:
+		reference_genome_summary = "meta/reference_genomes.summary",
 		sequenced_reads_summary=["meta/sequenced_reads.dat"],
 		alignment_summaries = expand("meta/alignments.vs_{ref_genome}.{aligner}.summary", ref_genome=['droSim1', 'droSec1'], aligner=['bwa','bwaUniq']),
 	output:
@@ -223,4 +247,9 @@ rule write_report:
 #pandoc_path="/nas/longleaf/apps/rstudio/1.0.136/bin/pandoc"
 #R -e Sys.setenv"(RSTUDIO_PANDOC='$pandoc_path')" -e  rmarkdown::render"('$markDown_in',output_file='$pdf_Out')"
 #R -e "setwd('/proj/cdjones_lab/csoeder/PopPsiSeq')" -e Sys.setenv"(RSTUDIO_PANDOC='$pandoc_path')" -e  rmarkdown::render"('scripts/PopPsiSeq_summary.Rmd',output_file='test.pdf')"
+
+
+
+
+
 
