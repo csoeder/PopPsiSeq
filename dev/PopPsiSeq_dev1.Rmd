@@ -300,4 +300,70 @@ ggplot(all_alignments %>%  filter(measure=="avg_depth")) +geom_line(aes(x=aligne
 ggplot(all_alignments %>%  filter(measure=="total_breadth"))+geom_line(aes(x=aligner,y=value, group=sample), color="black") + geom_point(aes(x=aligner,y=value, group=sample, color=sample)) + facet_grid(.~reference)+ labs(title="Breadth of Coverage")
 ```
 
+## 28 Nov 2018
 
+Retooling some diagrams and pipes
+```{r echo=FALSE}
+
+bam_sum_test <- all_alignments %>%  filter( (measure=='total_read_count' & aligner=="bwa") | measure == 'total_mapped_count' ) %>% mutate(measure=ifelse(aligner=="bwaUniq", "filtered_mapped_count", ifelse(measure=="total_read_count","total_read_count","total_mapped_count"))) 
+bam_sum_test$measure <- factor(bam_sum_test$measure, levels = c('total_read_count','total_mapped_count','filtered_mapped_count'))
+
+ggplot(bam_sum_test) + geom_line(aes(group=sample, x=measure,y=value)) + geom_point(aes(x=measure, y=value, group=sample,color=sample))+ facet_grid(.~reference) + labs(title="Read Counts by Processing Step: Raw, Mapped, Filtered", x="", y="Number Reads" ) + scale_y_log10()
+
+
+
+bam_sum_test.spread <- bam_sum_test %>% select(-c(aligner)) %>%  spread(measure, value) %>%  mutate(mapping_retention=total_mapped_count/total_read_count, filter_retention = filtered_mapped_count/total_mapped_count)
+
+bam_sum_test.spread %>% gather(total_read_count:filtered_mapped_count, key="measure", value="value") %>%  group_by(measure) %>% summarise(minimum = min(value), average=mean(value), median = median(value), maximum = max(value)) %>% mutate(minimum = human_readable_croncher(minimum), average=human_readable_croncher(average), median = human_readable_croncher(median), maximum = human_readable_croncher(maximum)) %>% kable(caption="Read Counts During Alignment & Filtration")
+```
+
+We can easily break down the table further with a second grouping:
+
+```{r echo=FALSE}
+
+bam_sum_test.spread %>% gather(total_read_count:filtered_mapped_count, key="measure", value="value") %>%  group_by(measure, reference) %>% summarise(minimum = min(value), average=mean(value), median = median(value), maximum = max(value)) %>% mutate(minimum = human_readable_croncher(minimum), average=human_readable_croncher(average), median = human_readable_croncher(median), maximum = human_readable_croncher(maximum)) %>% kable(caption="Read Counts During Alignment & Filtration")
+```
+
+using spread and gather to clean up this mess:
+```{r echo=FALSE, include=FALSE}
+
+before_After.cov <- inner_join( vs_droSim1.bwa %>%  filter(measure=='avg_depth' | measure == 'total_breadth') %>% select(-c(aligner)) %>% spread(measure, value), vs_droSim1.bwaUniq %>%  filter(measure=='avg_depth' | measure == 'total_breadth') %>% select(-c(aligner)) %>% spread(measure, value), by='sample', suffix=c(".before",".after") ) %>%  mutate(depth_retention = avg_depth.after/avg_depth.before, breadth_retention=total_breadth.after/total_breadth.before)
+```
+
+```{r echo=FALSE, include=FALSE}
+
+depth.process <- all_alignments %>%  filter(measure=='avg_depth' ) %>% spread(aligner, value) %>%  mutate(depth_retention = 100*bwaUniq/bwa) %>% rename(before=bwa, after=bwaUniq)
+
+covstats.dpth <- depth.process %>% summarise(step="pre-filtration depth",minimum = min(before), average=mean(before), median = median(before), maximum = max(before))
+
+covstats.dpth <- rbind(covstats.dpth, depth.process %>% summarise(step="post-filtration depth",minimum = min(after), average=mean(after), median = median(after), maximum = max(after)))
+
+
+covstats.dpth <- rbind(covstats.dpth, depth.process  %>% summarise(step="depth retention percent",minimum = min(depth_retention), average=mean(depth_retention), median = median(depth_retention), maximum = max(depth_retention)))
+
+
+covstats.dpth %>% kable(caption="Depth of Coverage Statistics for Raw and Filtered Alignments", digits=1 )
+
+```
+
+```{r echo=FALSE, include=FALSE}
+ggplot(depth.process %>%  select(-c(depth_retention)) %>%  gather(before:after, key=measure, value=value) %>% mutate(measure=factor(measure, levels=c("before","after"))) ) + geom_point(aes(group=sample, x=measure,y=value, color=sample)) + geom_line(aes(group=sample, x=measure,y=value)) + facet_grid(.~reference)
+
+```
+
+Again, just group_by() for a more detailed breakdown:
+
+```{r echo=FALSE, include=FALSE}
+depth.process %>% group_by(reference)%>% summarise(step="pre-filtration depth",minimum = min(bwa), average=mean(bwa), median = median(bwa), maximum = max(bwa)) 
+```
+
+
+
+
+
+
+
+```{r echo=FALSE, include=FALSE}
+
+breadth.process <- all_alignments %>%  filter(measure=='total_breadth' ) %>% spread(aligner, value) %>%  mutate(breadth_retention = 100*bwaUniq/bwa)
+```

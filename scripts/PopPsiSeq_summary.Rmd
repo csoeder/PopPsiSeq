@@ -146,45 +146,54 @@ ggplot(dupe_stats) + geom_histogram(aes(x=percent), bins=15) + labs(title="Dupli
 Reads were first mapped to a reference genome using the BWA SAMPE/SE algorithm. Then, the alignment file was filtered for uniqueness (ie, a read must be aligned optimally with no alternative or runner-up hits, "XT:A:U.*X0:i:1.*X1:i:0"), mapping/sequencing quality ("-q 20 -F 0x0100 -F 0x0200 -F 0x0300 -F 0x04"), and deduplication. 
 
 ```{r echo=FALSE, include=FALSE}
-vs_droSim1.bwa <- read_delim("meta/alignments.vs_droSim1.bwa.summary", "\t", escape_double = FALSE, col_names = FALSE, trim_ws = TRUE)
-names(vs_droSim1.bwa) <- c("sample","measure","value")
-vs_droSim1.bwa$aligner <- as.factor("bwa")
-vs_droSim1.bwa$sample <- as.factor(vs_droSim1.bwa$sample)
-vs_droSim1.bwa$measure <- as.factor(vs_droSim1.bwa$measure)
+vs_droSim1.bwa <- bam_summary_loader(filename = "meta/alignments.vs_droSim1.bwa.summary",aligner="bwa", reference="droSim1")
+vs_droSec1.bwa <- bam_summary_loader(filename = "meta/alignments.vs_droSec1.bwa.summary",aligner="bwa", reference="droSec1")
+vs_droSim1.bwaUniq <- bam_summary_loader(filename = "meta/alignments.vs_droSim1.bwaUniq.summary",aligner="bwaUniq", reference="droSim1")
+vs_droSec1.bwaUniq <- bam_summary_loader(filename = "meta/alignments.vs_droSec1.bwaUniq.summary",aligner="bwaUniq", reference="droSec1")
 
-vs_droSim1.bwaUniq <- read_delim("meta/alignments.vs_droSim1.bwaUniq.summary", "\t", escape_double = FALSE, col_names = FALSE, trim_ws = TRUE)
-names(vs_droSim1.bwaUniq) <- c("sample","measure","value")
-vs_droSim1.bwaUniq$aligner <- as.factor("bwaUniq")
-vs_droSim1.bwaUniq$sample <- as.factor(vs_droSim1.bwaUniq$sample)
-vs_droSim1.bwaUniq$measure <- as.factor(vs_droSim1.bwaUniq$measure)
+all_alignments <- rbind(vs_droSim1.bwa,vs_droSec1.bwa,vs_droSim1.bwaUniq,vs_droSec1.bwaUniq)
 ```
 
 ### Read & Alignment Quality
 
 ```{r echo=FALSE}
 
-before_After.counts <- rbind(vs_droSim1.bwa %>%  filter(measure=='total_read_count' | measure == 'total_mapped_count'), vs_droSim1.bwaUniq %>%  filter( measure == 'total_mapped_count') %>% mutate(measure='filtered_mapped_count'))
+#before_After.counts <- rbind(vs_droSim1.bwa %>%  filter(measure=='total_read_count' | measure == 'total_mapped_count'), vs_droSim1.bwaUniq %>%  filter( measure == 'total_mapped_count') %>% mutate(measure='filtered_mapped_count'))
 
-before_After.counts$measure <- factor(before_After.counts$measure, levels = c('total_read_count','total_mapped_count','filtered_mapped_count'))
+#before_After.counts$measure <- factor(before_After.counts$measure, levels = c('total_read_count','total_mapped_count','filtered_mapped_count'))
 
-ggplot(before_After.counts) + geom_line(aes(group=sample, x=measure,y=value)) + geom_line(aes(group=sample, x=measure,y=value)) + geom_point(aes(x=measure, y=value, group=sample,color=sample)) + labs(title="Read Counts by Processing Step: Raw, Mapped, Filtered", x="", y="Number Reads" ) + scale_y_log10()
+#ggplot(before_After.counts) + geom_line(aes(group=sample, x=measure,y=value)) + geom_line(aes(group=sample, x=measure,y=value)) + geom_point(aes(x=measure, y=value, group=sample,color=sample)) + labs(title="Read Counts by Processing Step: Raw, Mapped, Filtered", x="", y="Number Reads" ) + scale_y_log10()
+
+
+
+readcount_process <- all_alignments %>%  filter( (measure=='total_read_count' & aligner=="bwa") | measure == 'total_mapped_count' ) %>% mutate(measure=ifelse(aligner=="bwaUniq", "filtered_mapped_count", ifelse(measure=="total_read_count","total_read_count","total_mapped_count"))) 
+readcount_process$measure <- factor(readcount_process$measure, levels = c('total_read_count','total_mapped_count','filtered_mapped_count'))
+
+ggplot(readcount_process) + geom_line(aes(group=sample, x=measure,y=value)) + geom_point(aes(x=measure, y=value, group=sample,color=sample))+ facet_grid(.~reference) + labs(title="Read Counts by Processing Step: Raw, Mapped, Filtered", x="", y="Number Reads" ) + scale_y_log10()
+
+
+
 
 ```
 
 ```{r echo=FALSE}
-before_After.counts.aug <- before_After.counts %>% select(-c(aligner)) %>% spread(measure, value) %>%  mutate(mapping_retention=total_mapped_count/total_read_count, filter_retention = filtered_mapped_count/total_mapped_count)
+#before_After.counts.aug <- before_After.counts %>% select(-c(aligner)) %>% spread(measure, value) %>%  mutate(mapping_retention=total_mapped_count/total_read_count, filter_retention = filtered_mapped_count/total_mapped_count)
+
+readcount_process.spread <- readcount_process %>% select(-c(aligner)) %>%  spread(measure, value) %>%  mutate(mapping_retention=total_mapped_count/total_read_count, filter_retention = filtered_mapped_count/total_mapped_count)
 
 #before_After.counts$measure <- factor(before_After.counts$measure, levels = c('total_read_count','total_mapped_count','filtered_mapped_count'))
-before_After.counts$measure <- factor(before_After.counts$measure, levels = c('filtered_mapped_count','total_mapped_count','total_read_count'))
+#before_After.counts$measure <- factor(before_After.counts$measure, levels = c('filtered_mapped_count','total_mapped_count','total_read_count'))
 
-before_After.counts.aug %>% gather(total_read_count:filtered_mapped_count, key="measure", value="value") %>%  group_by(measure) %>% summarise(minimum = min(value), average=mean(value), median = median(value), maximum = max(value)) %>% mutate(minimum = human_readable_croncher(minimum), average=human_readable_croncher(average), median = human_readable_croncher(median), maximum = human_readable_croncher(maximum)) %>% kable(caption="Read Counts During Alignment & Filtration")
+#before_After.counts.aug %>% gather(total_read_count:filtered_mapped_count, key="measure", value="value") %>%  group_by(measure) %>% summarise(minimum = min(value), average=mean(value), median = median(value), maximum = max(value)) %>% mutate(minimum = human_readable_croncher(minimum), average=human_readable_croncher(average), median = human_readable_croncher(median), maximum = human_readable_croncher(maximum)) %>% kable(caption="Read Counts During Alignment & Filtration")
+
+readcount_process.spread%>% gather(total_read_count:filtered_mapped_count, key="measure", value="value") %>%  group_by(measure) %>% summarise(minimum = min(value), average=mean(value), median = median(value), maximum = max(value)) %>% mutate(minimum = human_readable_croncher(minimum), average=human_readable_croncher(average), median = human_readable_croncher(median), maximum = human_readable_croncher(maximum)) %>% kable(caption="Read Counts During Alignment & Filtration")
 
 ```
 
 The fraction of reads retained at each point:
 
 ```{r echo=FALSE}
-before_After.counts.aug %>% gather(mapping_retention:filter_retention, key="measure", value="value") %>%  group_by(measure) %>% summarise(minimum = min(100*value), average=mean(100*value), median = median(100*value), maximum = max(100*value)) %>% mutate(minimum = human_readable_croncher(minimum), average=human_readable_croncher(average), median = human_readable_croncher(median), maximum = human_readable_croncher(maximum)) %>%  kable(caption="Percentage of Reads Retained at Each Step",digits=1)
+readcount_process.spread %>% gather(mapping_retention:filter_retention, key="measure", value="value") %>%  group_by(measure) %>% summarise(minimum = min(100*value), average=mean(100*value), median = median(100*value), maximum = max(100*value)) %>% mutate(minimum = human_readable_croncher(minimum), average=human_readable_croncher(average), median = human_readable_croncher(median), maximum = human_readable_croncher(maximum)) %>%  kable(caption="Percentage of Reads Retained at Each Step",digits=1)
 
 ```
 
@@ -204,19 +213,33 @@ before_After.cov.gathered.meta <- inner_join(before_After.cov %>%  gather(avg_de
 Depth of coverage, ie, the genome-wide average number of mapped reads per base pair:
 
 ```{r echo=FALSE}
-covstats.dpth <- before_After.cov %>% gather(avg_depth.before, key=measure, value=value) %>% summarise(step="pre-filtration depth",minimum = min(value), average=mean(value), median = median(value), maximum = max(value))
+#covstats.dpth <- before_After.cov %>% gather(avg_depth.before, key=measure, value=value) %>% summarise(step="pre-filtration depth",minimum = min(value), average=mean(value), median = median(value), maximum = max(value))
 
-covstats.dpth <- rbind(covstats.dpth, before_After.cov %>% gather(avg_depth.after, key=measure, value=value)  %>% summarise(step="post-filtration depth",minimum = min(value), average=mean(value), median = median(value), maximum = max(value)))
+#covstats.dpth <- rbind(covstats.dpth, before_After.cov %>% gather(avg_depth.after, key=measure, value=value)  %>% summarise(step="post-filtration depth",minimum = min(value), average=mean(value), median = median(value), maximum = max(value)))
 
 
-covstats.dpth <- rbind(covstats.dpth, before_After.cov %>% gather(depth_retention, key=measure, value=value)  %>% summarise(step="depth retention percent",minimum = 100*min(value), average=100*mean(value), median = 100*median(value), maximum = 100*max(value)))
+#covstats.dpth <- rbind(covstats.dpth, before_After.cov %>% gather(depth_retention, key=measure, value=value)  %>% summarise(step="depth retention percent",minimum = 100*min(value), average=100*mean(value), median = 100*median(value), maximum = 100*max(value)))
 
-covstats.dpth %>%  mutate(minimum = human_readable_croncher(minimum), average=human_readable_croncher(average), median = human_readable_croncher(median), maximum = human_readable_croncher(maximum)) %>% kable(caption="Depth of Coverage Statistics for Raw and Filtered Alignments", digits=3 )
+#covstats.dpth %>%  mutate(minimum = human_readable_croncher(minimum), average=human_readable_croncher(average), median = human_readable_croncher(median), maximum = human_readable_croncher(maximum)) %>% kable(caption="Depth of Coverage Statistics for Raw and Filtered Alignments", digits=3 )
+
+depth.process <- all_alignments %>%  filter(measure=='avg_depth' ) %>% spread(aligner, value) %>%  mutate(depth_retention = 100*bwaUniq/bwa) %>% rename( before=bwa, after=bwaUniq)
+
+covstats.dpth <- depth.process %>% summarise(step="pre-filtration depth",minimum = min(before), average=mean(before), median = median(before), maximum = max(before))
+
+covstats.dpth <- rbind(covstats.dpth, depth.process %>% summarise(step="post-filtration depth",minimum = min(after), average=mean(after), median = median(after), maximum = max(after)))
+
+covstats.dpth <- rbind(covstats.dpth, depth.process  %>% summarise(step="depth retention percent",minimum = min(depth_retention), average=mean(depth_retention), median = median(depth_retention), maximum = max(depth_retention)))
+
+covstats.dpth %>% kable(caption="Depth of Coverage Statistics for Raw and Filtered Alignments", digits=1 )
 ```
 
 ```{r echo=FALSE}
 
-ggplot(before_After.cov.gathered.meta %>% filter(measure== "avg_depth.before" | measure== "avg_depth.after") %>% mutate(measure=factor(measure, levels=c("avg_depth.before" , "avg_depth.after" )))) + geom_line(aes(group=sample, x=measure,y=value, color=experimental)) + geom_point(aes(x=measure, y=value, group=sample)) + labs(title="Depth Of Coverage for Raw and Filtered Alignments", x="", y="Reads Per BP, Genome-Wide" )
+#ggplot(before_After.cov.gathered.meta %>% filter(measure== "avg_depth.before" | measure== "avg_depth.after") %>% mutate(measure=factor(measure, levels=c("avg_depth.before" , "avg_depth.after" )))) + geom_line(aes(group=sample, x=measure,y=value, color=experimental)) + geom_point(aes(x=measure, y=value, group=sample)) + labs(title="Depth Of Coverage for Raw and Filtered Alignments", x="", y="Reads Per BP, Genome-Wide" )
+
+
+ggplot(depth.process %>%  select(-c(depth_retention)) %>%  gather(before:after, key=measure, value=value) %>% mutate(measure=factor(measure, levels=c("before","after"))) ) +geom_line(aes(group=sample, x=measure,y=value))+ geom_point(aes(group=sample, x=measure,y=value, color=sample))  + facet_grid(.~reference) + labs(title="Depth Of Coverage for Raw and Filtered Alignments", x="", y="Reads Per BP, Genome-Wide" )
+
 
 ```
 
