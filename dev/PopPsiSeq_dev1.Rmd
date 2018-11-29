@@ -303,6 +303,9 @@ ggplot(all_alignments %>%  filter(measure=="total_breadth"))+geom_line(aes(x=ali
 ## 28 Nov 2018
 
 Retooling some diagrams and pipes
+
+
+
 ```{r echo=FALSE}
 
 bam_sum_test <- all_alignments %>%  filter( (measure=='total_read_count' & aligner=="bwa") | measure == 'total_mapped_count' ) %>% mutate(measure=ifelse(aligner=="bwaUniq", "filtered_mapped_count", ifelse(measure=="total_read_count","total_read_count","total_mapped_count"))) 
@@ -354,16 +357,52 @@ ggplot(depth.process %>%  select(-c(depth_retention)) %>%  gather(before:after, 
 Again, just group_by() for a more detailed breakdown:
 
 ```{r echo=FALSE, include=FALSE}
-depth.process %>% group_by(reference)%>% summarise(step="pre-filtration depth",minimum = min(bwa), average=mean(bwa), median = median(bwa), maximum = max(bwa)) 
+depth.process %>% group_by(reference)%>% summarise(step="pre-filtration depth",minimum = min(before), average=mean(before), median = median(before), maximum = max(before)) 
 ```
 
 
-
-
+## 29 Nov 2018
 
 
 
 ```{r echo=FALSE, include=FALSE}
 
-breadth.process <- all_alignments %>%  filter(measure=='total_breadth' ) %>% spread(aligner, value) %>%  mutate(breadth_retention = 100*bwaUniq/bwa)
+breadth.process <- all_alignments %>%  filter(measure=='total_breadth' ) %>% spread(aligner, value) %>%  mutate(breadth_retention = 100*bwaUniq/bwa) %>% rename(before=bwa, after=bwaUniq)
+
+
+covstats.brdth <- breadth.process %>% summarise(step="pre-filtration breadth",minimum = 100*min(before), average=100*mean(before), median = 100*median(before), maximum = 100*max(before))
+
+covstats.brdth <- rbind(covstats.brdth, breadth.process %>% summarise(step="post-filtration breadth",minimum = 100*min(after), average=100*mean(after), median = 100*median(after), maximum = 100*max(after)))
+
+covstats.brdth <- rbind(covstats.brdth, breadth.process  %>% summarise(step="breadth retention percent",minimum = min(breadth_retention), average=mean(breadth_retention), median = median(breadth_retention), maximum = max(breadth_retention)))
+
+covstats.brdth %>% kable(caption="Breadth of Coverage Statistics for Raw and Filtered Alignments", digits=1 )
+
 ```
+
+
+```{r echo=FALSE, include=FALSE}
+ggplot(breadth.process %>%  select(-c(breadth_retention)) %>%  gather(before:after, key=measure, value=value) %>% mutate(measure=factor(measure, levels=c("before","after"))) ) + geom_point(aes(group=sample, x=measure,y=value, color=sample)) + geom_line(aes(group=sample, x=measure,y=value)) + facet_grid(.~reference)
+
+```
+
+do this to include script contents eg in the methods
+```{r  engine='bash', comment='', tidy=TRUE, tidy.opts=list(width.cutoff=60)} 
+cat scripts/bam_summarizer.py
+```
+
+yikes, looks like i might need to run a pep8 check LOL
+
+VCFs are done building:
+
+ cat all_samples.vs_droSim1.bwaUniq.vcf | head -n 1000 > all_samples.vs_droSim1.bwaUniq.vcf.subset
+
+
+
+
+
+
+
+
+
+

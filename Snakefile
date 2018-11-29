@@ -1,6 +1,6 @@
 configfile: 'config.yaml'
 
-#module load python/3.5.1 samtools freebayes vcftools bwa bedtools
+#module load python/3.5.1 samtools freebayes vcftools bwa bedtools r/3.5.0 rstudio/1.1.453
 
 sample_by_name = {c['name'] : c for c in config['data_sets']}
 ref_genome_by_name = { g['name'] : g for g in config['reference_genomes']}
@@ -31,8 +31,8 @@ rule reference_genome_reporter:
 		report_out = "meta/reference_genomes/{ref_gen}.fai.report"
 	shell:
 		"""
-		mkdir -p meta/reference_genomes/;
-		awk '{sum+=$2} END { print "number_contigs\t",NR; print "number_bases\t",sum}' | sed -e 's/^/{wildcards.ref_gen}\t/g' > {output.report_out};
+		mkdir -p meta/reference_genomes/
+		cat {input.fai_in} | awk '{{sum+=$2}} END {{ print "number_contigs\t",NR; print "number_bases\t",sum}}' | sed -e 's/^/{wildcards.ref_gen}\t/g' > {output.report_out};
 		"""
 
 rule demand_reference_genome_summary:
@@ -185,7 +185,7 @@ rule bam_reporter:
 		shell("samtools flagstat {input.bam_in} > {input.bam_in}.flagstat")
 		shell("bedtools genomecov -max 1 -ibam {input.bam_in} -g {ref_genome_idx} > {input.bam_in}.genomcov")
 		#change the -max flag as needed to set 
-		shell("""samtools depth -a {input.bam_in} | awk '{sum+=$3; sumsq+=$3*$3} END { print "average_depth\t",sum/NR; print "std_depth\t",sqrt(sumsq/NR - (sum/NR)**2)}' > {input.bam_in}.dpthStats""")
+		shell("""samtools depth -a {input.bam_in} | awk '{{sum+=$3; sumsq+=$3*$3}} END {{ print "average_depth\t",sum/NR; print "std_depth\t",sqrt(sumsq/NR - (sum/NR)**2)}}' > {input.bam_in}.dpthStats""")
 		#https://www.biostars.org/p/5165/
 		#save the depth file and offload the statistics to the bam_summarizer script?? 
 		shell("python3 scripts/bam_summarizer.py -f {input.bam_in}.flagstat -i {input.bam_in}.idxstats -g {input.bam_in}.genomcov -d {input.bam_in}.dpthStats -o {output.report_out} -t {wildcards.sample}")
@@ -211,7 +211,7 @@ rule joint_vcf_caller:
 	input:
 		bams_in = lambda wildcards: expand("mapped_reads/{sample}.vs_{ref_genome}.{aligner}.sort.bam", sample=sample_by_name.keys(), ref_genome=wildcards.ref_genome, aligner=wildcards.aligner),
 	output:
-		vcf_out = "all_samples.vs_{ref_genome}.{aligner}.vcf"
+		vcf_out = "variants/all_samples.vs_{ref_genome}.{aligner}.vcf"
 	params:
 		freebayes="--standard-filters",
 		runmem_gb=8,
@@ -225,12 +225,52 @@ rule joint_vcf_caller:
 
 ## VCF summary report? eg, shared fraction of genome covered by x% of samples at mindepth?
 
+
+
+rule vcf_reporter:
+	input:
+		vcf_in = "variants/{prefix}.vs_{ref_genome}.{aligner}.vcf"
+	output:
+		report_out = "meta/VCFs/{prefix}.vs_{ref_genome}.{aligner}.summary"
+	params:
+		runmem_gb=8,
+		runtime="4:00:00",
+#	message:
+#		"Collecting metadata for the {wildcards.aligner} alignment of {wildcards.sample} to {wildcards.ref_genome}.... "
+	shell:
+		"""
+		cat {input.vcf_in}  | grep -v "#" | cut -f 1 | sort | uniq -c > {output.report_out}.snpsPerContig.tmp
+		cat {output.report_out}.snpsPerContig.tmp | awk '{{sum+=$1}} END {{ print sum,"\ttotal"}}' | cat {output.report_out}.snpsPerContig.tmp - > {output.report_out}.snpsPerContig
+		rm {output.report_out}.snpsPerContig.tmp
+		vcftools  --vcf {input.vcf_in} --out {output.report_out} --freq 
+		vcftools  --vcf {input.vcf_in} --out {output.report_out} --counts
+		vcftools  --vcf {input.vcf_in} --out {output.report_out} --missing-indv
+		vcftools  --vcf {input.vcf_in} --out {output.report_out} --missing-site
+		vcftools  --vcf {input.vcf_in} --out {output.report_out} --singeltons
+		touch {output.report_out}
+		"""
+
+rule summon_VCF_analytics_base:
+	input:
+		bam_reports = lambda wildcards: expand("meta/VCFs/{prefix}.vs_{ref_genome}.{aligner}.summary", prefix=wildcards.prefix, ref_genome=["droSim1","droSec1"], aligner="bwaUniq")
+	output:
+		full_report = "meta/{prefix}.calledVariants.{aligner}.summary"
+	params:
+		runmem_gb=1,
+		runtime="1:00",
+	message:
+		"collecting all alignment metadata.... "
+	shell:
+		"cat {input.bam_reports} > {output.full_report}"
+
 ## benchmarking??
 #	https://snakemake.readthedocs.io/en/stable/snakefiles/rules.html#benchmark-rules
 
+
+
 rule write_report:
 	input:
-		reference_genome_summary = "meta/reference_genomes.summary",
+		reference_genome_summary = ["meta/reference_genomes.summary"],
 		sequenced_reads_summary=["meta/sequenced_reads.dat"],
 		alignment_summaries = expand("meta/alignments.vs_{ref_genome}.{aligner}.summary", ref_genome=['droSim1', 'droSec1'], aligner=['bwa','bwaUniq']),
 	output:
@@ -242,8 +282,8 @@ rule write_report:
 		"writing up the results.... "
 	run:
 		pandoc_path="/nas/longleaf/apps/rstudio/1.0.136/bin/pandoc"
-		pwd = shell("pwd")
-		shell(""" R -e "setwd('{pwd}')" -e Sys.setenv"(RSTUDIO_PANDOC='{pandoc_path}')" -e  rmarkdown::render"('scripts/PopPsiSeq_summary.Rmd',output_file='{output.pdf_out}')"  """)
+		pwd = subprocess.check_output("pwd",shell=True).decode()
+		shell(""" R -e "setwd('{pwd}/');" -e Sys.setenv"(RSTUDIO_PANDOC='{pandoc_path}')" -e  rmarkdown::render"('scripts/PopPsiSeq_summary.Rmd',output_file='{output.pdf_out}')"  """)
 #pandoc_path="/nas/longleaf/apps/rstudio/1.0.136/bin/pandoc"
 #R -e Sys.setenv"(RSTUDIO_PANDOC='$pandoc_path')" -e  rmarkdown::render"('$markDown_in',output_file='$pdf_Out')"
 #R -e "setwd('/proj/cdjones_lab/csoeder/PopPsiSeq')" -e Sys.setenv"(RSTUDIO_PANDOC='$pandoc_path')" -e  rmarkdown::render"('scripts/PopPsiSeq_summary.Rmd',output_file='test.pdf')"

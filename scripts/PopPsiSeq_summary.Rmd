@@ -246,24 +246,26 @@ ggplot(depth.process %>%  select(-c(depth_retention)) %>%  gather(before:after, 
 
 Breadth of coverage, ie, the percentage of the genome covered by at least one read:
 
-```{r echo=FALSE}
+```{r echo=FALSE, include=FALSE}
 
-covstats.brth <- before_After.cov %>% gather(total_breadth.before, key=measure, value=value) %>% summarise(step="pre-filtration breadth",minimum = 100*min(value), average=100*mean(value), median = 100*median(value), maximum = 100*max(value))
-
-covstats.brth <- rbind(covstats.brth, before_After.cov %>% gather(total_breadth.after, key=measure, value=value)  %>% summarise(step="post-filtration breadth",minimum = 100*min(value), average=100*mean(value), median = 100*median(value), maximum = 100*max(value)))
+breadth.process <- all_alignments %>%  filter(measure=='total_breadth' ) %>% spread(aligner, value) %>%  mutate(breadth_retention = 100*bwaUniq/bwa) %>% rename(before=bwa, after=bwaUniq)
 
 
-covstats.brth <- rbind(covstats.brth, before_After.cov %>% gather(breadth_retention, key=measure, value=value)  %>% summarise(step="breadth retention",minimum = 100*min(value), average=100*mean(value), median = 100*median(value), maximum = 100*max(value)))
+covstats.brdth <- breadth.process %>% summarise(step="pre-filtration breadth",minimum = 100*min(before), average=100*mean(before), median = 100*median(before), maximum = 100*max(before))
 
-covstats.brth %>% kable(caption="Breadth of Coverage Statistics for Raw and Filtered Alignments", digits=1)
+covstats.brdth <- rbind(covstats.brdth, breadth.process %>% summarise(step="post-filtration breadth",minimum = 100*min(after), average=100*mean(after), median = 100*median(after), maximum = 100*max(after)))
+
+covstats.brdth <- rbind(covstats.brdth, breadth.process  %>% summarise(step="breadth retention percent",minimum = min(breadth_retention), average=mean(breadth_retention), median = median(breadth_retention), maximum = max(breadth_retention)))
+
+covstats.brdth %>% kable(caption="Breadth of Coverage Statistics for Raw and Filtered Alignments", digits=1 )
 
 ```
 
 
-```{r echo=FALSE}
-ggplot(before_After.cov.gathered.meta %>% filter(measure== "total_breadth.before" | measure== "total_breadth.after") %>% mutate(measure=factor(measure, levels=c("total_breadth.before" , "total_breadth.after" )))) + geom_line(aes(group=sample, x=measure,y=100*value, color=experimental)) + geom_point(aes(x=measure, y=100*value, group=sample)) + labs(title="Breadth Of Coverage for Raw and Filtered Alignments", x="", y="Percentage of Genome Mapped To" )
-```
+```{r echo=FALSE, include=FALSE}
+ggplot(breadth.process %>%  select(-c(breadth_retention)) %>%  gather(before:after, key=measure, value=value) %>% mutate(measure=factor(measure, levels=c("before","after")), value=100*value) ) + geom_point(aes(group=sample, x=measure,y=value, color=sample)) + geom_line(aes(group=sample, x=measure,y=value)) + facet_grid(.~reference) + labs(title="Depth Of Coverage for Raw and Filtered Alignments", x="", y="Percentage of Reference Genome Mapped To" )
 
+```
 
 # Results
 
