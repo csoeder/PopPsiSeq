@@ -15,6 +15,7 @@ bibliography: references.bib
 knitr::opts_chunk$set(echo = TRUE)
 knitr::opts_chunk$set(root.dir = '/Users/csoeder/Research/PSIseq/PopPsiSeq/')
 knitr::opts_knit$set(root.dir='/Users/csoeder/Research/PSIseq/PopPsiSeq/')
+#knitr::opts_knit$set(root.dir='/proj/cdjones_lab/csoeder/PopPsiSeq/')
 library("tidyverse")
 library("knitr")
 library("yaml")
@@ -64,7 +65,19 @@ trammel <- read_yaml("config.yaml")
 ```{r include=FALSE}
 ref_genomes.cfg.df <- plyr::ldply(trammel$reference_genomes, data.frame)
 ```
-The droSim1 and droSec1 reference genomes were downloaded in FASTA format from UCSC Genome Browser. 
+The droSim1 and droSec1 reference genomes were downloaded in FASTA format from UCSC Genome Browser. These were in the 140-170Mb range, with the droSec1 relatively unconsolidated:
+
+```{r echo=FALSE}
+
+reference_genomes_summaryStats <- read_delim("meta/reference_genomes.summary", "\t", escape_double = FALSE, col_names = FALSE, trim_ws = TRUE)
+
+names(reference_genomes_summaryStats) <- c("refGenome","measure","value")
+
+reference_genomes_summaryStats %>% mutate( value=human_readable_croncher(value)) %>% spread(refGenome, value) %>% rename('Reference Genome:'=measure) %>% kable(caption="Size and Consolidation of Reference Genomes")
+
+```
+
+(add a by-chromosome breakdown for droSim and a histogram for droSec?)
 
 
 ## Sequenced Reads
@@ -213,14 +226,6 @@ before_After.cov.gathered.meta <- inner_join(before_After.cov %>%  gather(avg_de
 Depth of coverage, ie, the genome-wide average number of mapped reads per base pair:
 
 ```{r echo=FALSE}
-#covstats.dpth <- before_After.cov %>% gather(avg_depth.before, key=measure, value=value) %>% summarise(step="pre-filtration depth",minimum = min(value), average=mean(value), median = median(value), maximum = max(value))
-
-#covstats.dpth <- rbind(covstats.dpth, before_After.cov %>% gather(avg_depth.after, key=measure, value=value)  %>% summarise(step="post-filtration depth",minimum = min(value), average=mean(value), median = median(value), maximum = max(value)))
-
-
-#covstats.dpth <- rbind(covstats.dpth, before_After.cov %>% gather(depth_retention, key=measure, value=value)  %>% summarise(step="depth retention percent",minimum = 100*min(value), average=100*mean(value), median = 100*median(value), maximum = 100*max(value)))
-
-#covstats.dpth %>%  mutate(minimum = human_readable_croncher(minimum), average=human_readable_croncher(average), median = human_readable_croncher(median), maximum = human_readable_croncher(maximum)) %>% kable(caption="Depth of Coverage Statistics for Raw and Filtered Alignments", digits=3 )
 
 depth.process <- all_alignments %>%  filter(measure=='avg_depth' ) %>% spread(aligner, value) %>%  mutate(depth_retention = 100*bwaUniq/bwa) %>% rename( before=bwa, after=bwaUniq)
 
@@ -234,22 +239,15 @@ covstats.dpth %>% kable(caption="Depth of Coverage Statistics for Raw and Filter
 ```
 
 ```{r echo=FALSE}
-
-#ggplot(before_After.cov.gathered.meta %>% filter(measure== "avg_depth.before" | measure== "avg_depth.after") %>% mutate(measure=factor(measure, levels=c("avg_depth.before" , "avg_depth.after" )))) + geom_line(aes(group=sample, x=measure,y=value, color=experimental)) + geom_point(aes(x=measure, y=value, group=sample)) + labs(title="Depth Of Coverage for Raw and Filtered Alignments", x="", y="Reads Per BP, Genome-Wide" )
-
-
-ggplot(depth.process %>%  select(-c(depth_retention)) %>%  gather(before:after, key=measure, value=value) %>% mutate(measure=factor(measure, levels=c("before","after"))) ) +geom_line(aes(group=sample, x=measure,y=value))+ geom_point(aes(group=sample, x=measure,y=value, color=sample))  + facet_grid(.~reference) + labs(title="Depth Of Coverage for Raw and Filtered Alignments", x="", y="Reads Per BP, Genome-Wide" )
+ggplot(depth.process %>%  select(-c(depth_retention,measure)) %>%  gather(before:after, key=measure, value=value) %>% mutate(measure=factor(measure, levels=c("before","after"))) ) +geom_line(aes(group=sample, x=measure,y=value))+ geom_point(aes(group=sample, x=measure,y=value, color=sample))  + facet_grid(.~reference) + labs(title="Depth Of Coverage for Raw and Filtered Alignments", x="", y="Reads Per BP, Genome-Wide" )
 
 
 ```
 
-
 Breadth of coverage, ie, the percentage of the genome covered by at least one read:
 
 ```{r echo=FALSE, include=FALSE}
-
 breadth.process <- all_alignments %>%  filter(measure=='total_breadth' ) %>% spread(aligner, value) %>%  mutate(breadth_retention = 100*bwaUniq/bwa) %>% rename(before=bwa, after=bwaUniq)
-
 
 covstats.brdth <- breadth.process %>% summarise(step="pre-filtration breadth",minimum = 100*min(before), average=100*mean(before), median = 100*median(before), maximum = 100*max(before))
 
@@ -263,9 +261,21 @@ covstats.brdth %>% kable(caption="Breadth of Coverage Statistics for Raw and Fil
 
 
 ```{r echo=FALSE, include=FALSE}
-ggplot(breadth.process %>%  select(-c(breadth_retention)) %>%  gather(before:after, key=measure, value=value) %>% mutate(measure=factor(measure, levels=c("before","after")), value=100*value) ) + geom_point(aes(group=sample, x=measure,y=value, color=sample)) + geom_line(aes(group=sample, x=measure,y=value)) + facet_grid(.~reference) + labs(title="Depth Of Coverage for Raw and Filtered Alignments", x="", y="Percentage of Reference Genome Mapped To" )
+ggplot(breadth.process %>%  select(-c(breadth_retention, measure)) %>%  gather(before:after, key=measure, value=value) %>% mutate(measure=factor(measure, levels=c("before","after")), value=100*value) ) + geom_point(aes(group=sample, x=measure,y=value, color=sample)) + geom_line(aes(group=sample, x=measure,y=value)) + facet_grid(.~reference) + labs(title="Depth Of Coverage for Raw and Filtered Alignments", x="", y="Percentage of Reference Genome Mapped To" )
 
 ```
+
+
+
+## Called Variants
+
+BWAUniq mappings were used to jointly call variants in VCF format via Freebayes [@Garrison2012] using standard filters. 
+
+
+
+
+
+
 
 # Results
 

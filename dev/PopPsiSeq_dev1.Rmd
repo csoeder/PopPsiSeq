@@ -328,12 +328,12 @@ bam_sum_test.spread %>% gather(total_read_count:filtered_mapped_count, key="meas
 ```
 
 using spread and gather to clean up this mess:
-```{r echo=FALSE, include=FALSE}
+```{r echo=FALSE}
 
 before_After.cov <- inner_join( vs_droSim1.bwa %>%  filter(measure=='avg_depth' | measure == 'total_breadth') %>% select(-c(aligner)) %>% spread(measure, value), vs_droSim1.bwaUniq %>%  filter(measure=='avg_depth' | measure == 'total_breadth') %>% select(-c(aligner)) %>% spread(measure, value), by='sample', suffix=c(".before",".after") ) %>%  mutate(depth_retention = avg_depth.after/avg_depth.before, breadth_retention=total_breadth.after/total_breadth.before)
 ```
 
-```{r echo=FALSE, include=FALSE}
+```{r echo=FALSE}
 
 depth.process <- all_alignments %>%  filter(measure=='avg_depth' ) %>% spread(aligner, value) %>%  mutate(depth_retention = 100*bwaUniq/bwa) %>% rename(before=bwa, after=bwaUniq)
 
@@ -349,14 +349,14 @@ covstats.dpth %>% kable(caption="Depth of Coverage Statistics for Raw and Filter
 
 ```
 
-```{r echo=FALSE, include=FALSE}
-ggplot(depth.process %>%  select(-c(depth_retention)) %>%  gather(before:after, key=measure, value=value) %>% mutate(measure=factor(measure, levels=c("before","after"))) ) + geom_point(aes(group=sample, x=measure,y=value, color=sample)) + geom_line(aes(group=sample, x=measure,y=value)) + facet_grid(.~reference)
+```{r echo=FALSE}
+ggplot(depth.process %>%  select(-c(depth_retention, measure)) %>%  gather(before:after, key=measure, value=value) %>% mutate(measure=factor(measure, levels=c("before","after"))) ) + geom_point(aes(group=sample, x=measure,y=value, color=sample)) + geom_line(aes(group=sample, x=measure,y=value)) + facet_grid(.~reference)
 
 ```
 
 Again, just group_by() for a more detailed breakdown:
 
-```{r echo=FALSE, include=FALSE}
+```{r echo=FALSE}
 depth.process %>% group_by(reference)%>% summarise(step="pre-filtration depth",minimum = min(before), average=mean(before), median = median(before), maximum = max(before)) 
 ```
 
@@ -365,7 +365,7 @@ depth.process %>% group_by(reference)%>% summarise(step="pre-filtration depth",m
 
 
 
-```{r echo=FALSE, include=FALSE}
+```{r echo=FALSE}
 
 breadth.process <- all_alignments %>%  filter(measure=='total_breadth' ) %>% spread(aligner, value) %>%  mutate(breadth_retention = 100*bwaUniq/bwa) %>% rename(before=bwa, after=bwaUniq)
 
@@ -381,7 +381,7 @@ covstats.brdth %>% kable(caption="Breadth of Coverage Statistics for Raw and Fil
 ```
 
 
-```{r echo=FALSE, include=FALSE}
+```{r echo=FALSE}
 ggplot(breadth.process %>%  select(-c(breadth_retention)) %>%  gather(before:after, key=measure, value=value) %>% mutate(measure=factor(measure, levels=c("before","after"))) ) + geom_point(aes(group=sample, x=measure,y=value, color=sample)) + geom_line(aes(group=sample, x=measure,y=value)) + facet_grid(.~reference)
 
 ```
@@ -399,8 +399,16 @@ VCFs are done building:
 
 
 
+## 30 Nov 2018
+```{r echo=FALSE}
 
+reference_genomes_summaryStats <- read_delim("meta/reference_genomes.summary", "\t", escape_double = FALSE, col_names = FALSE, trim_ws = TRUE)
 
+names(reference_genomes_summaryStats) <- c("refGenome","measure","value")
+
+reference_genomes_summaryStats %>% mutate( value=human_readable_croncher(value)) %>% spread(refGenome, value) %>% rename('Reference Genome:'=measure) %>% kable(caption="Size and Consolidation of Reference Genomes")
+
+```
 
 
 

@@ -246,7 +246,7 @@ rule vcf_reporter:
 		vcftools  --vcf {input.vcf_in} --out {output.report_out} --counts
 		vcftools  --vcf {input.vcf_in} --out {output.report_out} --missing-indv
 		vcftools  --vcf {input.vcf_in} --out {output.report_out} --missing-site
-		vcftools  --vcf {input.vcf_in} --out {output.report_out} --singeltons
+		vcftools  --vcf {input.vcf_in} --out {output.report_out} --singletons
 		touch {output.report_out}
 		"""
 
@@ -284,6 +284,7 @@ rule write_report:
 		pandoc_path="/nas/longleaf/apps/rstudio/1.0.136/bin/pandoc"
 		pwd = subprocess.check_output("pwd",shell=True).decode()
 		shell(""" R -e "setwd('{pwd}/');" -e Sys.setenv"(RSTUDIO_PANDOC='{pandoc_path}')" -e  rmarkdown::render"('scripts/PopPsiSeq_summary.Rmd',output_file='{output.pdf_out}')"  """)
+		shell(""" cp scripts/{output.pdf_out} {output.pdf_out} """)
 #pandoc_path="/nas/longleaf/apps/rstudio/1.0.136/bin/pandoc"
 #R -e Sys.setenv"(RSTUDIO_PANDOC='$pandoc_path')" -e  rmarkdown::render"('$markDown_in',output_file='$pdf_Out')"
 #R -e "setwd('/proj/cdjones_lab/csoeder/PopPsiSeq')" -e Sys.setenv"(RSTUDIO_PANDOC='$pandoc_path')" -e  rmarkdown::render"('scripts/PopPsiSeq_summary.Rmd',output_file='test.pdf')"
