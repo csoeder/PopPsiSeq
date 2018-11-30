@@ -13,9 +13,10 @@ bibliography: references.bib
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-knitr::opts_chunk$set(root.dir = '/Users/csoeder/Research/PSIseq/PopPsiSeq/')
+#knitr::opts_chunk$set(root.dir = '/Users/csoeder/Research/PSIseq/PopPsiSeq/')
 knitr::opts_knit$set(root.dir='/Users/csoeder/Research/PSIseq/PopPsiSeq/')
 #knitr::opts_knit$set(root.dir='/proj/cdjones_lab/csoeder/PopPsiSeq/')
+#knitr::opts_knit$set(root.dir=peaDubDee)
 library("tidyverse")
 library("knitr")
 library("yaml")

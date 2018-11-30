@@ -9,8 +9,9 @@ output:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-knitr::opts_chunk$set(root.dir = '/Users/csoeder/Research/PSIseq/PopPsiSeq/')
+#knitr::opts_chunk$set(root.dir = '/Users/csoeder/Research/PSIseq/PopPsiSeq/')
 knitr::opts_knit$set(root.dir='/Users/csoeder/Research/PSIseq/PopPsiSeq/')
+#knitr::opts_knit$set(root.dir='/proj/cdjones_lab/csoeder/PopPsiSeq/')
 library("tidyverse")
 library("knitr")
 
@@ -382,7 +383,7 @@ covstats.brdth %>% kable(caption="Breadth of Coverage Statistics for Raw and Fil
 
 
 ```{r echo=FALSE}
-ggplot(breadth.process %>%  select(-c(breadth_retention)) %>%  gather(before:after, key=measure, value=value) %>% mutate(measure=factor(measure, levels=c("before","after"))) ) + geom_point(aes(group=sample, x=measure,y=value, color=sample)) + geom_line(aes(group=sample, x=measure,y=value)) + facet_grid(.~reference)
+ggplot(breadth.process %>%  select(-c(breadth_retention, measure)) %>%  gather(before:after, key=measure, value=value) %>% mutate(measure=factor(measure, levels=c("before","after"))) ) + geom_point(aes(group=sample, x=measure,y=value, color=sample)) + geom_line(aes(group=sample, x=measure,y=value)) + facet_grid(.~reference)
 
 ```
 
@@ -404,12 +405,17 @@ VCFs are done building:
 
 reference_genomes_summaryStats <- read_delim("meta/reference_genomes.summary", "\t", escape_double = FALSE, col_names = FALSE, trim_ws = TRUE)
 
-names(reference_genomes_summaryStats) <- c("refGenome","measure","value")
+names(reference_genomes.summaryStats) <- c("refGenome","measure","value")
 
-reference_genomes_summaryStats %>% mutate( value=human_readable_croncher(value)) %>% spread(refGenome, value) %>% rename('Reference Genome:'=measure) %>% kable(caption="Size and Consolidation of Reference Genomes")
+reference_genomes.summaryStats %>% mutate( value=human_readable_croncher(value)) %>% spread(refGenome, value) %>% rename('Reference Genome:'=measure) %>% kable(caption="Size and Consolidation of Reference Genomes")
 
 ```
 
+
+Shored up the command-line PDF generation to build the output in a designated path (ie, the PopPsiSeq head)
+
+https://stackoverflow.com/questions/31463143/pass-parameters-from-command-line-into-r-markdown-document
+https://github.com/yihui/knitr/issues/913
 
 
 

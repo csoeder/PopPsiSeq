@@ -283,8 +283,10 @@ rule write_report:
 	run:
 		pandoc_path="/nas/longleaf/apps/rstudio/1.0.136/bin/pandoc"
 		pwd = subprocess.check_output("pwd",shell=True).decode()
-		shell(""" R -e "setwd('{pwd}/');" -e Sys.setenv"(RSTUDIO_PANDOC='{pandoc_path}')" -e  rmarkdown::render"('scripts/PopPsiSeq_summary.Rmd',output_file='{output.pdf_out}')"  """)
-		shell(""" cp scripts/{output.pdf_out} {output.pdf_out} """)
+		shell(""" R -e "setwd('{pwd}');Sys.setenv(RSTUDIO_PANDOC='{pandoc_path}')" -e  "peaDubDee='{pwd}'; rmarkdown::render('scripts/PopPsiSeq_summary.Rmd',output_file='{pwd}{output.pdf_out}')"  """)
+#		shell(""" R -e "setwd('{pwd}/');" -e Sys.setenv"(RSTUDIO_PANDOC='{pandoc_path}')" -e  rmarkdown::render"('scripts/PopPsiSeq_summary.Rmd',output_file='{output.pdf_out}')"  """)
+#		shell(""" R -e Sys.setenv"(RSTUDIO_PANDOC='{pandoc_path}')" -e  "thetitle='My title'; theauthor='me'; rmarkdown::render('scripts/PopPsiSeq_summary.Rmd',output_file='{output.pdf_out}')"  """)
+#		shell(""" cp scripts/{output.pdf_out} {output.pdf_out} """)
 #pandoc_path="/nas/longleaf/apps/rstudio/1.0.136/bin/pandoc"
 #R -e Sys.setenv"(RSTUDIO_PANDOC='$pandoc_path')" -e  rmarkdown::render"('$markDown_in',output_file='$pdf_Out')"
 #R -e "setwd('/proj/cdjones_lab/csoeder/PopPsiSeq')" -e Sys.setenv"(RSTUDIO_PANDOC='$pandoc_path')" -e  rmarkdown::render"('scripts/PopPsiSeq_summary.Rmd',output_file='test.pdf')"
