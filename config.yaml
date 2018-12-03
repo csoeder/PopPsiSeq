@@ -10,8 +10,15 @@ data_sets:
       paired: True
       path: FASTQs/2013/10A/
       experimental: selection
-      readsfile1: 10A.R1.fastq
-      readsfile2: 10A.R2.fastq
+      readsfile1: 10A_BC15_F_TTAGGC_L006_R1_001.fastq
+      readsfile2: 10A_BC15_F_TTAGGC_L006_R2_001.fastq
+      source: EarlyJones2013
+    - name: 10B
+      paired: True
+      path: FASTQs/2013/10B/
+      experimental: selection
+      readsfile1: 10B_BC15_F_TGACCA_L006_R1_001.fastq
+      readsfile2: 10B_BC15_F_TGACCA_L006_R2_001.fastq
       source: EarlyJones2013
     - name: SRR303333
       paired: False

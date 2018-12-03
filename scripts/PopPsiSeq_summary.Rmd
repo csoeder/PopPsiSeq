@@ -63,16 +63,17 @@ trammel <- read_yaml("config.yaml")
 ```
 
 ## Reference Genomes
-```{r include=FALSE}
+```{r include=FALSE, echo=FALSE}
 ref_genomes.cfg.df <- plyr::ldply(trammel$reference_genomes, data.frame)
+
+reference_genomes_summaryStats <- read_delim("meta/reference_genomes.summary", "\t", escape_double = FALSE, col_names = FALSE, trim_ws = TRUE)
+
+names(reference_genomes_summaryStats) <- c("refGenome","measure","value")
 ```
 The droSim1 and droSec1 reference genomes were downloaded in FASTA format from UCSC Genome Browser. These were in the 140-170Mb range, with the droSec1 relatively unconsolidated:
 
 ```{r echo=FALSE}
 
-reference_genomes_summaryStats <- read_delim("meta/reference_genomes.summary", "\t", escape_double = FALSE, col_names = FALSE, trim_ws = TRUE)
-
-names(reference_genomes_summaryStats) <- c("refGenome","measure","value")
 
 reference_genomes_summaryStats %>% mutate( value=human_readable_croncher(value)) %>% spread(refGenome, value) %>% rename('Reference Genome:'=measure) %>% kable(caption="Size and Consolidation of Reference Genomes")
 
@@ -272,6 +273,64 @@ ggplot(breadth.process %>%  select(-c(breadth_retention, measure)) %>%  gather(b
 
 BWAUniq mappings were used to jointly call variants in VCF format via Freebayes [@Garrison2012] using standard filters. 
 
+
+```{r echo=FALSE, include=FALSE}
+
+all_samples.calledVariants.summaryStats <- read_delim("~/Research/PSIseq/PopPsiSeq/meta/all_samples.calledVariants.bwaUniq.summary", "\t", escape_double = FALSE, col_names = FALSE, trim_ws = TRUE)
+names(all_samples.calledVariants.summaryStats) <-c("group", "refGenome","measure","value")
+
+reference_genomes_summaryStats.sprud <- reference_genomes_summaryStats %>%  spread(measure,value) %>%  select(c(-number_contigs)) 
+
+all_samples.calledVariants.snpCount <- inner_join(all_samples.calledVariants.summaryStats %>%  filter(measure=="total_snp_count") %>% spread(measure, value) , reference_genomes_summaryStats.sprud, by=c("refGenome"="refGenome"))
+
+```
+
+```{r echo=FALSE}
+
+all_samples.calledVariants.snpCount %>%  mutate(snp_rate=1000*total_snp_count/number_bases, total_snp_count=human_readable_croncher(total_snp_count), number_bases=human_readable_croncher(number_bases) ) %>% select(-c(group)) %>% select(c(refGenome, number_bases, total_snp_count, snp_rate)) %>% rename(`reference genome` = refGenome,`Genome size (bp)`=number_bases, `total SNP count`=total_snp_count, `SNPs per kB`=snp_rate) %>% kable(caption="SNP count and per-KB SNP rate across all samples", digits=1)
+
+
+```
+
+
+To build this VCF, `r nrow(data_sets.df)` samples called jointly. However, not all sites were called in all samples (eg, due to coverage differences). The sites had the following group-wide call rate:
+
+
+```{r echo=FALSE, include=FALSE}
+all_samples_vs_droSec1.lmiss <- read_delim("meta/VCFs/all_samples.vs_droSec1.bwaUniq.summary.lmiss", "\t", escape_double = FALSE, trim_ws = TRUE)
+all_samples_vs_droSec1.lmiss$refgenome <- "droSec1"
+
+all_samples_vs_droSim1.lmiss <- read_delim("meta/VCFs/all_samples.vs_droSim1.bwaUniq.summary.lmiss", "\t", escape_double = FALSE, trim_ws = TRUE)
+all_samples_vs_droSim1.lmiss$refgenome <- "droSim1"
+
+
+nsamps <- nrow(data_sets.df)
+
+
+all_samples.lmiss <- rbind(all_samples_vs_droSim1.lmiss, all_samples_vs_droSec1.lmiss) %>% select(c(refgenome, N_MISS)) %>%  mutate(refgenome=as.factor(refgenome), N_PRES=nsamps-N_MISS)
+
+```
+
+
+```{r echo=FALSE}
+ggplot(all_samples.lmiss) + geom_freqpoly(aes(x=N_PRES, group=refgenome, color=refgenome), bins=nsamps) + scale_x_continuous(name ="Number Samples",limits=c(1,nsamps), breaks =seq(1,nsamps,1)) + labs(title="Histogram of SNPs by Number of Samples Called At Site", y="Number of Sites")
+```
+
+
+The fraction of jointly called SNPs which are individually callable:
+
+```{r echo=FALSE}
+
+all_samples.imiss.augmented <- inner_join(all_samples.imiss, breadth.process %>%  select(c(sample,reference,after)) %>% rename(breadth=after)%>% mutate(breadth = 100*breadth), by=c("name"="sample", "refgenome"="reference"))
+all_samples.imiss.augmented <-inner_join(all_samples.imiss.augmented, depth.process %>%  select(c(sample,reference,after)) %>% rename(depth=after), by=c("name"="sample", "refgenome"="reference"))
+
+all_samples.imiss.augmented <- all_samples.imiss.augmented %>%  gather(breadth:depth, key="measure", value="value")
+
+```
+
+```{r echo=FALSE}
+ggplot(all_samples.imiss.augmented) + geom_point(aes(x= value, y=1-F_MISS, color=refgenome)) + facet_grid(.~measure, scales="free_x") + geom_text(data=subset(all_samples.imiss.augmented, 1-F_MISS < 0.75 & measure=="breadth"),aes(value,1-F_MISS,label=name)) + labs(x="", y="Fraction of SNPs Callable", title="Jointly Called SNPs Callable per Sample, by Breadth and Depth of Coverage")
+```
 
 
 

@@ -247,8 +247,13 @@ rule vcf_reporter:
 		vcftools  --vcf {input.vcf_in} --out {output.report_out} --missing-indv
 		vcftools  --vcf {input.vcf_in} --out {output.report_out} --missing-site
 		vcftools  --vcf {input.vcf_in} --out {output.report_out} --singletons
-		touch {output.report_out}
+
+		ref_genome={wildcards.ref_genome}
+
+		tail -n 1 {output.report_out}.snpsPerContig | awk '{print "total_snp_count\t"$1}' | sed -e 's/^/'$ref_genome'\t/g' > {output.report_out}
 		"""
+	#cat  all_samples.vs_droSec1.bwaUniq.summary.frq.count| cut -f 3 | tail -n +2 | sort | uniq -c
+	#####	bi, tri, and quadralelic counts ^^ 
 
 rule summon_VCF_analytics_base:
 	input:
@@ -261,7 +266,10 @@ rule summon_VCF_analytics_base:
 	message:
 		"collecting all alignment metadata.... "
 	shell:
-		"cat {input.bam_reports} > {output.full_report}"
+		"""
+		prefix={wildcards.prefix}
+		cat {input.bam_reports} | sed -e 's/^/'$prefix'\t/g'> {output.full_report}
+		"""
 
 ## benchmarking??
 #	https://snakemake.readthedocs.io/en/stable/snakefiles/rules.html#benchmark-rules
@@ -282,7 +290,7 @@ rule write_report:
 		"writing up the results.... "
 	run:
 		pandoc_path="/nas/longleaf/apps/rstudio/1.0.136/bin/pandoc"
-		pwd = subprocess.check_output("pwd",shell=True).decode()
+		pwd = subprocess.check_output("pwd",shell=True).decode().rstrip()+"/"
 		shell(""" R -e "setwd('{pwd}');Sys.setenv(RSTUDIO_PANDOC='{pandoc_path}')" -e  "peaDubDee='{pwd}'; rmarkdown::render('scripts/PopPsiSeq_summary.Rmd',output_file='{pwd}{output.pdf_out}')"  """)
 #		shell(""" R -e "setwd('{pwd}/');" -e Sys.setenv"(RSTUDIO_PANDOC='{pandoc_path}')" -e  rmarkdown::render"('scripts/PopPsiSeq_summary.Rmd',output_file='{output.pdf_out}')"  """)
 #		shell(""" R -e Sys.setenv"(RSTUDIO_PANDOC='{pandoc_path}')" -e  "thetitle='My title'; theauthor='me'; rmarkdown::render('scripts/PopPsiSeq_summary.Rmd',output_file='{output.pdf_out}')"  """)

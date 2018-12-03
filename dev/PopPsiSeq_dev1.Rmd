@@ -403,7 +403,7 @@ VCFs are done building:
 ## 30 Nov 2018
 ```{r echo=FALSE}
 
-reference_genomes_summaryStats <- read_delim("meta/reference_genomes.summary", "\t", escape_double = FALSE, col_names = FALSE, trim_ws = TRUE)
+reference_genomes.summaryStats <- read_delim("meta/reference_genomes.summary", "\t", escape_double = FALSE, col_names = FALSE, trim_ws = TRUE)
 
 names(reference_genomes.summaryStats) <- c("refGenome","measure","value")
 
@@ -416,6 +416,120 @@ Shored up the command-line PDF generation to build the output in a designated pa
 
 https://stackoverflow.com/questions/31463143/pass-parameters-from-command-line-into-r-markdown-document
 https://github.com/yihui/knitr/issues/913
+
+
+Starting basic stats on the VCFs....
+
+
+
+total SNP count & rate:
+```{r echo=FALSE}
+
+all_samples.calledVariants.summaryStats <- read_delim("~/Research/PSIseq/PopPsiSeq/meta/all_samples.calledVariants.bwaUniq.summary", "\t", escape_double = FALSE, col_names = FALSE, trim_ws = TRUE)
+names(all_samples.calledVariants.summaryStats) <-c("group", "refGenome","measure","value")
+
+reference_genomes.summaryStats.sprud <- reference_genomes.summaryStats %>%  spread(measure,value) %>%  select(c(-number_contigs)) 
+
+all_samples.calledVariants.snpCount <- inner_join(all_samples.calledVariants.summaryStats %>%  filter(measure=="total_snp_count") %>% spread(measure, value) , reference_genomes.summaryStats.sprud, by=c("refGenome"="refGenome"))
+
+```
+
+```{r echo=FALSE}
+
+all_samples.calledVariants.snpCount %>%  mutate(snp_rate=1000*total_snp_count/number_bases, total_snp_count=human_readable_croncher(total_snp_count), number_bases=human_readable_croncher(number_bases) ) %>% select(-c(group)) %>% select(c(refGenome, number_bases, total_snp_count, snp_rate)) %>% rename(`reference genome` = refGenome,`Genome size (bp)`=number_bases, `total SNP count`=total_snp_count, `SNPs per kB`=snp_rate) %>% kable(caption="SNP count and per-KB SNP rate across all samples")
+
+
+```
+
+sample calls by site:
+
+```{r echo=FALSE}
+all_samples_vs_droSec1.lmiss <- read_delim("meta/VCFs/all_samples.vs_droSec1.bwaUniq.summary.lmiss", "\t", escape_double = FALSE, trim_ws = TRUE)
+all_samples_vs_droSec1.lmiss$refgenome <- "droSec1"
+
+all_samples_vs_droSim1.lmiss <- read_delim("meta/VCFs/all_samples.vs_droSim1.bwaUniq.summary.lmiss", "\t", escape_double = FALSE, trim_ws = TRUE)
+all_samples_vs_droSim1.lmiss$refgenome <- "droSim1"
+
+
+nsamps <- nrow(data_sets.df)
+
+
+all_samples.lmiss <- rbind(all_samples_vs_droSim1.lmiss, all_samples_vs_droSec1.lmiss) %>% select(c(refgenome, N_MISS)) %>%  mutate(refgenome=as.factor(refgenome), N_PRES=nsamps-N_MISS)
+
+```
+
+```{r echo=FALSE}
+ggplot(all_samples_vs_droSim1.lmiss %>% select(c(CHR, N_MISS)) %>%  mutate(CHR=as.factor(CHR), N_PRES=nsamps-N_MISS) ) + geom_freqpoly(aes(x=N_PRES, group=CHR, color=CHR), bins=nsamps)+ scale_x_continuous(name ="Number Samples",limits=c(1,nsamps), breaks =seq(1,nsamps,1)) + labs(title="Histogram of SNPs by Number of Samples Called At Site (droSim1)", y="Number of Sites")
+
+```
+
+```{r echo=FALSE}
+ggplot(all_samples.lmiss) + geom_freqpoly(aes(x=N_PRES, group=refgenome, color=refgenome), bins=nsamps) + scale_x_continuous(name ="Number Samples",limits=c(1,nsamps), breaks =seq(1,nsamps,1)) + labs(title="Histogram of SNPs by Number of Samples Called At Site", y="Number of Sites")
+```
+
+uncalled sites by sample:
+
+```{r echo=FALSE}
+all_samples_vs_droSec1.imiss <- read_delim("meta/VCFs/all_samples.vs_droSec1.bwaUniq.summary.imiss", "\t", escape_double = FALSE, trim_ws = TRUE)
+all_samples_vs_droSec1.imiss$refgenome <- "droSec1"
+
+all_samples_vs_droSim1.imiss <- read_delim("meta/VCFs/all_samples.vs_droSim1.bwaUniq.summary.imiss", "\t", escape_double = FALSE, trim_ws = TRUE)
+all_samples_vs_droSim1.imiss$refgenome <- "droSim1"
+
+all_samples.imiss  <- rbind(all_samples_vs_droSec1.imiss, all_samples_vs_droSim1.imiss)  %>%  mutate(name=as.factor(INDV), refgenome=as.factor(refgenome), N_PRES=N_DATA-N_MISS) %>% select(c( name, N_MISS, N_PRES, F_MISS,refgenome))
+
+
+```
+
+
+```{r echo=FALSE}
+ggplot(all_samples.imiss) + geom_freqpoly(aes(x=1-F_MISS, group=refgenome, color=refgenome), bins=7) + labs(title="Histogram of SNPs by Number of Samples Called At Site", y="Number of Individuals", x="Fraction of Jointly Called SNPs Callable per Individual") + scale_x_continuous(limits=c(0,1), breaks =seq(0,1,0.2))
+```
+
+```{r echo=FALSE}
+
+all_samples.imiss.augmented <- inner_join(all_samples.imiss, breadth.process %>%  select(c(sample,reference,after)) %>% rename(breadth=after)%>% mutate(breadth = 100*breadth), by=c("name"="sample", "refgenome"="reference"))
+all_samples.imiss.augmented <-inner_join(all_samples.imiss.augmented, depth.process %>%  select(c(sample,reference,after)) %>% rename(depth=after), by=c("name"="sample", "refgenome"="reference"))
+
+all_samples.imiss.augmented <- all_samples.imiss.augmented %>%  gather(breadth:depth, key="measure", value="value")
+
+```
+https://stackoverflow.com/questions/15015356/how-to-do-selective-labeling-with-ggplot-geom-point 
+```{r echo=FALSE}
+ggplot(all_samples.imiss.augmented) + geom_point(aes(x= value, y=1-F_MISS, color=refgenome)) + facet_grid(.~measure, scales="free_x") + geom_text(data=subset(all_samples.imiss.augmented, 1-F_MISS < 0.75 & measure=="breadth"),aes(value,1-F_MISS,label=name))
+```
+
+## 3 Dec 2018
+
+
+working on some of the analytics, using the vcftools standalone commands:
+
+```{bash eval=FALSE, echo=TRUE}
+
+vcf-subset variants/all_samples.vs_droSim1.bwaUniq.vcf -u -c SECH1,SECH2,SECH3 | head -n 200000 | vcftools --vcf - --recode --stdout > PopSech.vs_droSim1.bwaUniq.vcf 
+
+vcftools  --vcf PopSech.vs_droSim1.bwaUniq.vcf --out potato --freq 
+
+
+vcf-subset variants/all_samples.vs_droSim1.bwaUniq.vcf -u -c MD06m11d04y2010,MD73m11d04y2010,MD199m12d10y2010 | head -n 200000 | vcftools --vcf - --recode --stdout > PopSim.vs_droSim1.bwaUniq.vcf 
+
+vcftools  --vcf PopSim.vs_droSim1.bwaUniq.vcf --out PopSim --freq 
+
+vcf-subset variants/all_samples.vs_droSim1.bwaUniq.vcf -u -c SRR5860570,10A | head -n 200000 | vcftools --vcf - --recode --stdout > experimental.vs_droSim1.bwaUniq.vcf
+
+vcftools  --vcf experimental.vs_droSim1.bwaUniq.vcf --out experimental --freq 
+paste PopSech.frq PopSim.frq experimental.frq | awk '{if($3<3)print;}' | awk '{if($9<3)print;}' | awk '{if($15<3)print;}' |  cut -f 1,2,4,6,10,12,16,18 | grep -v nan | less
+
+
+```
+
+Add a group: PopSec,All tag or something in the config.yaml so that the -c string is callable
+
+-u to keep uncalled sites
+
+Maybe add filtering for sites (eg, AC > thresh, AF>thresh)
+
+Filter down to biallelic sites? --min-alleles 2 --max-alleles 2
 
 
 
