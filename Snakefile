@@ -254,6 +254,7 @@ rule vcf_reporter:
 		"""
 	#cat  all_samples.vs_droSec1.bwaUniq.summary.frq.count| cut -f 3 | tail -n +2 | sort | uniq -c
 	#####	bi, tri, and quadralelic counts ^^ 
+	#replace some of this with vcftools::vcf-stats ?
 
 rule summon_VCF_analytics_base:
 	input:

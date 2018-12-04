@@ -531,6 +531,49 @@ Maybe add filtering for sites (eg, AC > thresh, AF>thresh)
 
 Filter down to biallelic sites? --min-alleles 2 --max-alleles 2
 
+## 4 Dec 2018
 
 
+```{bash eval=FALSE, echo=TRUE}
+vcf-subset variants/all_samples.vs_droSim1.bwaUniq.vcf -u -c SECH1,SECH2,SECH3 | head -n 200000 | vcftools --min-alleles 2 --max-alleles 2  --max-missing-count 1  --vcf - --recode --stdout > PopSech.vs_droSim1.bwaUniq.vcf 
+
+vcf-subset variants/all_samples.vs_droSim1.bwaUniq.vcf -u -c MD06m11d04y2010,MD73m11d04y2010,MD199m12d10y2010 | head -n 200000 | vcftools --min-alleles 2 --max-alleles 2  --max-missing-count 1  --vcf - --recode --stdout > PopSim.vs_droSim1.bwaUniq.vcf 
+
+vcf-subset variants/all_samples.vs_droSim1.bwaUniq.vcf -u -c 10A | head -n 200000 | vcftools --min-alleles 2 --max-alleles 2  --max-missing-count 1  --vcf - --recode --stdout > experimental.vs_droSim1.bwaUniq.vcf 
+
+vcftools  --vcf PopSech.vs_droSim1.bwaUniq.vcf --out PopSech --freq 
+vcftools  --vcf PopSim.vs_droSim1.bwaUniq.vcf --out PopSim --freq 
+vcftools  --vcf experimental.vs_droSim1.bwaUniq.vcf --out experimental --freq 
+
+
+```
+ --max-missing-count 1  sets the number of uncalled samples allowed per site (see also --max-missing [float] for fraction)
+
+```{bash eval=FALSE, echo=TRUE}
+
+
+
+bedtools intersect -wa -wb -a <(cat PopSech.frq | tail -n +2 | awk '{print $1,$2,$2+1,$4,$5,$6}' | tr " " "\t") -b <(cat PopSim.frq | tail -n +2 | awk '{print $1,$2,$2+1,$4,$5,$6}' | tr " " "\t") | bedtools intersect -wa -wb -a - -b <(cat experimental.frq | tail -n +2 | awk '{print $1,$2,$2+1,$4,$5,$6}' | tr " " "\t") | cut -f 1,2,4-6,10,12,16,18 | tr ":" "\t" | awk '{print $1,$2,$4,$6,$3,$7,$8,$10,$11,$13}' | tr " " "\t" | grep -w "chr2L" > dev/grouped_freaks.dat
+ 
+
+```
+
+
+```{r echo=FALSE}
+
+grouped_freaks <- read_delim("dev/grouped_freaks.dat", "\t", escape_double = FALSE, col_names = FALSE, trim_ws = TRUE)
+names(grouped_freaks) <- c("chrom", "pos", "ref", "alt", "sec_count", "sec_alt_af", "sim_count", "sim_alt_af","exp_count", "exp_alt_af")
+
+grouped_freaks <- grouped_freaks %>% filter(!is.na(exp_alt_af))
+grouped_freaks$sim_introg_deltaF <- (grouped_freaks$exp_alt_af - grouped_freaks$sim_alt_af) * sign(grouped_freaks$sim_alt_af-grouped_freaks$sec_alt_af)
+
+
+grouped_freaks$sec_depletion_deltaF <- (grouped_freaks$exp_alt_af - grouped_freaks$sec_alt_af) * sign(grouped_freaks$sim_alt_af-grouped_freaks$sec_alt_af)
+
+
+ggplot(grouped_freaks %>% select(c(pos,sim_introg_deltaF,sec_depletion_deltaF)) %>%  gather(sim_introg_deltaF:sec_depletion_deltaF, key=measure, value=value) ) + geom_point(aes(x=pos,y=value,color=measure))
+
+```
+
+Plotting two values here: change in AF towards the AF in simulans (sim_introg_deltaF) and change away from the AF in sech (sec_depletion_deltaF)
 

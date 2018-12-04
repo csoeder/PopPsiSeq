@@ -20,6 +20,20 @@ data_sets:
       readsfile1: 10B_BC15_F_TGACCA_L006_R1_001.fastq
       readsfile2: 10B_BC15_F_TGACCA_L006_R2_001.fastq
       source: EarlyJones2013
+    - name: 17A
+      paired: True
+      path: FASTQs/2013/17A/
+      experimental: selection
+      readsfile1: 17A_BC15_F_CAGATC_L006_R1_001.fastq
+      readsfile2: 17A_BC15_F_CAGATC_L006_R2_001.fastq
+      source: EarlyJones2013
+    - name: 17B
+      paired: True
+      path: FASTQs/2013/17B/
+      experimental: selection
+      readsfile1: 17B_BC15_F_ACTTGA_L006_R1_001.fastq
+      readsfile2: 17B_BC15_F_ACTTGA_L006_R2_001.fastq
+      source: EarlyJones2013
     - name: SRR303333
       paired: False
       path: FASTQs/2011/SRR303333/
@@ -47,6 +61,13 @@ data_sets:
       readsfile1: SECH_3_1.fq
       readsfile2: SECH_3_2.fq
       source: matute
+    - name: SECH4
+      paired: True
+      path: FASTQs/matuteSec/SECH4/
+      species: drosophila sechellia
+      readsfile1: SECH_4-sech_Anro_B5_TGACCA_L001_R1_001.fastq
+      readsfile2: SECH_4-sech_Anro_B5_TGACCA_L001_R2_001.fastq
+      source: matute
     - name: MD06m11d04y2010
       paired: True
       path: FASTQs/matuteSim/MD06m11d04y2010/
@@ -68,7 +89,13 @@ data_sets:
       readsfile1: MD73_11_04_2010_54_R1_001.fastq
       readsfile2: MD73_11_04_2010_54_R2_001.fastq
       source: matute
-
+    - name: NS79m03d07y2011
+      paired: True
+      path: FASTQs/matuteSim/NS79m03d07y2011/
+      species: drosophila simulans
+      readsfile1: NS79_03_07_2011_75_R1_001.fastq
+      readsfile2: NS79_03_07_2011_75_R2_001.fastq
+      source: matute
 
 
 reference_genomes:

@@ -319,6 +319,18 @@ ggplot(all_samples.lmiss) + geom_freqpoly(aes(x=N_PRES, group=refgenome, color=r
 
 The fraction of jointly called SNPs which are individually callable:
 
+```{r echo=FALSE, include=FALSE}
+all_samples_vs_droSec1.imiss <- read_delim("meta/VCFs/all_samples.vs_droSec1.bwaUniq.summary.imiss", "\t", escape_double = FALSE, trim_ws = TRUE)
+all_samples_vs_droSec1.imiss$refgenome <- "droSec1"
+
+all_samples_vs_droSim1.imiss <- read_delim("meta/VCFs/all_samples.vs_droSim1.bwaUniq.summary.imiss", "\t", escape_double = FALSE, trim_ws = TRUE)
+all_samples_vs_droSim1.imiss$refgenome <- "droSim1"
+
+all_samples.imiss  <- rbind(all_samples_vs_droSec1.imiss, all_samples_vs_droSim1.imiss)  %>%  mutate(name=as.factor(INDV), refgenome=as.factor(refgenome), N_PRES=N_DATA-N_MISS) %>% select(c( name, N_MISS, N_PRES, F_MISS,refgenome))
+
+
+```
+
 ```{r echo=FALSE}
 
 all_samples.imiss.augmented <- inner_join(all_samples.imiss, breadth.process %>%  select(c(sample,reference,after)) %>% rename(breadth=after)%>% mutate(breadth = 100*breadth), by=c("name"="sample", "refgenome"="reference"))
