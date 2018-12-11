@@ -571,9 +571,111 @@ grouped_freaks$sim_introg_deltaF <- (grouped_freaks$exp_alt_af - grouped_freaks$
 grouped_freaks$sec_depletion_deltaF <- (grouped_freaks$exp_alt_af - grouped_freaks$sec_alt_af) * sign(grouped_freaks$sim_alt_af-grouped_freaks$sec_alt_af)
 
 
-ggplot(grouped_freaks %>% select(c(pos,sim_introg_deltaF,sec_depletion_deltaF)) %>%  gather(sim_introg_deltaF:sec_depletion_deltaF, key=measure, value=value) ) + geom_point(aes(x=pos,y=value,color=measure))
+#ggplot(grouped_freaks %>% select(c(pos,sim_introg_deltaF,sec_depletion_deltaF)) %>%  gather(sim_introg_deltaF:sec_depletion_deltaF, key=measure, value=value) ) + geom_point(aes(x=pos,y=value,color=measure))
 
 ```
 
 Plotting two values here: change in AF towards the AF in simulans (sim_introg_deltaF) and change away from the AF in sech (sec_depletion_deltaF)
+(very chunky plot has been silenced)
+
+
+## 11 Dec 2018
+
+```{bash eval=FALSE, echo=TRUE}
+grep "#" variants/all_samples.vs_droSim1.bwaUniq.vcf > all_samples.chr2L.vs_droSim1.bwaUniq.vcf
+grep -v "#" variants/all_samples.vs_droSim1.bwaUniq.vcf | grep -w chr2L  >> all_samples.chr2L.vs_droSim1.bwaUniq.vcf
+
+
+vcf-subset all_samples.chr2L.vs_droSim1.bwaUniq.vcf -u -c SECH1,SECH2,SECH3,SECH4 | vcftools --min-alleles 2 --max-alleles 2  --max-missing-count 1  --vcf - --recode --stdout > PopSech.chr2L.vs_droSim1.bwaUniq.vcf 
+
+vcf-subset all_samples.chr2L.vs_droSim1.bwaUniq.vcf -u -c MD06m11d04y2010,MD73m11d04y2010,MD199m12d10y2010,NS79m03d07y2011  | vcftools --min-alleles 2 --max-alleles 2  --max-missing-count 1  --vcf - --recode --stdout > PopSim.chr2L.vs_droSim1.bwaUniq.vcf 
+
+vcf-subset all_samples.chr2L.vs_droSim1.bwaUniq.vcf -u -c 10A,10B,17A,17B,SRR303333 | vcftools --min-alleles 2 --max-alleles 2  --max-missing-count 1  --vcf - --recode --stdout > selection.chr2L.vs_droSim1.bwaUniq.vcf 
+```
+
+
+(this could ultimately be implemented thus:)
+
+```{python eval=FALSE, echo=TRUE}
+sampname_by_group = {}
+for s in sample_by_name.keys():
+	subgroup_str = sample_by_name[s]['subgroups']
+	subgroup_lst = subgroup_str.split(",")
+	for g in subgroup_lst:
+		if g in sampname_by_group.keys:
+			sampname_by_group[g].append(s)
+		else:
+			sampname_by_group[g] = [s]
+
+#
+#	......
+#
+
+rule subset_VCF_to_subgroup:
+	input:
+		vcf_in = "variants/{prefix}.vs_{ref_genome}.{aligner}.vcf"
+	output:
+		vcf_out = "variants/{prefix}.subset_{subgroup}.vs_{ref_genome}.{aligner}.vcf"
+	run:
+		member_list = "%s,"*len(sampname_by_group[wildcards.subgroup]) % tuple(sampname_by_group[wildcards.subgroup])
+		shell("vcf-subset {input.vcf_in} -u -c {member_list} | vcftools --min-alleles 2 --max-alleles 2  --max-missing-count 1  --vcf - --recode --stdout > {output.vcf_out}")
+
+```
+uh.... wait, gotta see how YAML handles CSV lists.
+
+
+```{bash eval=FALSE, echo=TRUE}
+
+vcftools  --vcf PopSech.chr2L.vs_droSim1.bwaUniq.vcf --out PopSech.chr2L.vs_droSim1.bwaUniq --freq 
+vcftools  --vcf PopSim.chr2L.vs_droSim1.bwaUniq.vcf --out PopSim.chr2L.vs_droSim1.bwaUniq --freq 
+vcftools  --vcf selection.chr2L.vs_droSim1.bwaUniq.vcf --out selection.chr2L.vs_droSim1.bwaUniq --freq 
+
+
+bedtools intersect -wa -wb -a <(cat PopSech.chr2L.vs_droSim1.bwaUniq.frq | tail -n +2 | awk '{print $1,$2,$2+1,$4,$5,$6}' | tr " " "\t") -b <(cat PopSim.chr2L.vs_droSim1.bwaUniq.frq | tail -n +2 | awk '{print $1,$2,$2+1,$4,$5,$6}' | tr " " "\t") | bedtools intersect -wa -wb -a - -b <(cat selection.chr2L.vs_droSim1.bwaUniq.frq | tail -n +2 | awk '{print $1,$2,$2+1,$4,$5,$6}' | tr " " "\t") | cut -f 1,2,4-6,10,12,16,18 | tr ":" "\t" | awk '{print $1,$2,$2+1,"0","0","+",$4,$6,$3,$7,$8,$10,$11,$13}' | tr " " "\t" > dev/grouped_freaks2.bed
+
+
+```
+
+
+
+```{r echo=FALSE}
+
+library("rtracklayer")
+#source("http://bioconductor.org/biocLite.R")
+#biocLite("ggbio")
+library("ggbio")
+
+chr2L.freqCompare.bg <- import.bedGraph("dev/grouped_freaks2.bed", genome="droSim1")
+names(mcols(chr2L.freqCompare.bg)) <-  c("score", "name", "blup", "ref", "alt", "sec_count", "sec_alt_af", "sim_count", "sim_alt_af","exp_count", "exp_alt_af")
+
+chr2L.freqCompare.bg$sim_introg_deltaF <- (chr2L.freqCompare.bg$exp_alt_af - chr2L.freqCompare.bg$sim_alt_af) * sign(chr2L.freqCompare.bg$sim_alt_af-chr2L.freqCompare.bg$sec_alt_af)
+
+
+chr2L.freqCompare.bg$sec_depletion_deltaF <- (chr2L.freqCompare.bg$exp_alt_af - chr2L.freqCompare.bg$sec_alt_af) * sign(chr2L.freqCompare.bg$sim_alt_af-chr2L.freqCompare.bg$sec_alt_af)
+
+
+#tests to confirm this metric does what I think it does
+#chr2L.freqCompare.bg %>%  mcols() %>% as.tibble() %>% filter(sim_introg_deltaF < 0) %>%  View()
+
+autoplot(chr2L.freqCompare.bg, geom='point') + geom_point(aes(y=sim_introg_deltaF)) + theme_clear()
+
+```
+
+biocLite("HelloRanges")
+
+
+
+
+
+
+site count, binned by allele number at site:
+
+```{bash eval=TRUE, echo=FALSE}
+cat meta/VCFs/all_samples.vs_droSim1.bwaUniq.summary.frq | tail -n +2 | cut -f 3 | sort | uniq -c | awk '{print $2,$1}' | tr " " "\t"
+```
+
+Might multiallelic sites be of interest?
+
+
+
 

@@ -4,6 +4,16 @@ configfile: 'config.yaml'
 
 sample_by_name = {c['name'] : c for c in config['data_sets']}
 ref_genome_by_name = { g['name'] : g for g in config['reference_genomes']}
+sampname_by_group = {}
+for s in sample_by_name.keys():
+	subgroup_str = sample_by_name[s]['subgroups']
+	subgroup_lst = subgroup_str.split(",")
+	for g in subgroup_lst:
+		if g in sampname_by_group.keys:
+			sampname_by_group[g].append(s)
+		else:
+			sampname_by_group[g] = [s]
+
 
 
 
@@ -29,6 +39,9 @@ rule reference_genome_reporter:
 		fai_in = lambda wildcards: ref_genome_by_name[wildcards.ref_gen]['fai'],
 	output:
 		report_out = "meta/reference_genomes/{ref_gen}.fai.report"
+	params:
+		runmem_gb=1,
+		runtime="5:00",
 	shell:
 		"""
 		mkdir -p meta/reference_genomes/
@@ -40,6 +53,9 @@ rule demand_reference_genome_summary:
 		refgen_reports = lambda wildcards: expand("meta/reference_genomes/{ref_gen}.fai.report", ref_gen=ref_genome_by_name.keys())
 	output:
 		refgen_summary = "meta/reference_genomes.summary"
+	params:
+		runmem_gb=1,
+		runtime="5:00",
 	shell:
 		"cat {input.refgen_reports} > {output.refgen_summary}"
 
@@ -214,8 +230,8 @@ rule joint_vcf_caller:
 		vcf_out = "variants/all_samples.vs_{ref_genome}.{aligner}.vcf"
 	params:
 		freebayes="--standard-filters",
-		runmem_gb=8,
-		runtime="12:00:00",
+		runmem_gb=32,
+		runtime="96:00:00",
 	message:
 		"Jointly calling variants from all samples mapped to {wildcards.ref_genome} with {wildcards.aligner}"
 	run:
@@ -250,7 +266,7 @@ rule vcf_reporter:
 
 		ref_genome={wildcards.ref_genome}
 
-		tail -n 1 {output.report_out}.snpsPerContig | awk '{print "total_snp_count\t"$1}' | sed -e 's/^/'$ref_genome'\t/g' > {output.report_out}
+		tail -n 1 {output.report_out}.snpsPerContig | awk '{{print "total_snp_count\t"$1}}' | sed -e 's/^/'$ref_genome'\t/g' > {output.report_out}
 		"""
 	#cat  all_samples.vs_droSec1.bwaUniq.summary.frq.count| cut -f 3 | tail -n +2 | sort | uniq -c
 	#####	bi, tri, and quadralelic counts ^^ 
@@ -276,12 +292,26 @@ rule summon_VCF_analytics_base:
 #	https://snakemake.readthedocs.io/en/stable/snakefiles/rules.html#benchmark-rules
 
 
+rule subset_VCF_to_subgroup:
+	input:
+		vcf_in = "variants/{prefix}.vs_{ref_genome}.{aligner}.vcf"
+	output:
+		vcf_out = "variants/{prefix}.subset_{subgroup}.vs_{ref_genome}.{aligner}.vcf"
+	params:
+		runmem_gb=8,
+		runtime = "1:00:00",
+	message:
+		"Subsetting the variant file {input.vcf_in} to the individuals in the subgroup {wildcards.subgroup}.... "
+	run:
+		member_list = [samp]
+
 
 rule write_report:
 	input:
 		reference_genome_summary = ["meta/reference_genomes.summary"],
 		sequenced_reads_summary=["meta/sequenced_reads.dat"],
 		alignment_summaries = expand("meta/alignments.vs_{ref_genome}.{aligner}.summary", ref_genome=['droSim1', 'droSec1'], aligner=['bwa','bwaUniq']),
+		full_variant_summary = expand("meta/{prefix}.calledVariants.{aligner}.summary", aligner=["bwaUniq"], prefix=["all_samples"] ),
 	output:
 		pdf_out="thingy.pdf"
 	params:

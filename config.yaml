@@ -3,9 +3,10 @@ data_sets:
       paired: True
       path: FASTQs/otherSec/SRR5860570/
       experimental: control
-      readsfile1: SRR5860570_1.clean.fastq
-      readsfile2: SRR5860570_2.clean.fastq
+      readsfile1: SRR5860570_1.fastq
+      readsfile2: SRR5860570_2.fastq
       source: NCBI
+      subgroups: [all,control]
     - name: 10A
       paired: True
       path: FASTQs/2013/10A/
@@ -13,6 +14,7 @@ data_sets:
       readsfile1: 10A_BC15_F_TTAGGC_L006_R1_001.fastq
       readsfile2: 10A_BC15_F_TTAGGC_L006_R2_001.fastq
       source: EarlyJones2013
+      subgroups: [all,selection]
     - name: 10B
       paired: True
       path: FASTQs/2013/10B/
@@ -20,6 +22,7 @@ data_sets:
       readsfile1: 10B_BC15_F_TGACCA_L006_R1_001.fastq
       readsfile2: 10B_BC15_F_TGACCA_L006_R2_001.fastq
       source: EarlyJones2013
+      subgroups: [all,selection]
     - name: 17A
       paired: True
       path: FASTQs/2013/17A/
@@ -27,6 +30,7 @@ data_sets:
       readsfile1: 17A_BC15_F_CAGATC_L006_R1_001.fastq
       readsfile2: 17A_BC15_F_CAGATC_L006_R2_001.fastq
       source: EarlyJones2013
+      subgroups: [all,selection]
     - name: 17B
       paired: True
       path: FASTQs/2013/17B/
@@ -34,12 +38,14 @@ data_sets:
       readsfile1: 17B_BC15_F_ACTTGA_L006_R1_001.fastq
       readsfile2: 17B_BC15_F_ACTTGA_L006_R2_001.fastq
       source: EarlyJones2013
+      subgroups: [all,selection]
     - name: SRR303333
       paired: False
       path: FASTQs/2011/SRR303333/
       experimental: selection
-      readsfile: SRR303333.fq
+      readsfile: SRR303333.fastq
       source: EarlyJones2011
+      subgroups: [all,selection]
     - name: SECH1
       paired: True
       path: FASTQs/matuteSec/SECH1/
@@ -47,6 +53,7 @@ data_sets:
       readsfile1: SECH_1_1.fq
       readsfile2: SECH_1_2.fq
       source: matute
+      subgroups: [all,PopSec]
     - name: SECH2
       paired: True
       path: FASTQs/matuteSec/SECH2/
@@ -54,6 +61,7 @@ data_sets:
       readsfile1: SECH_2_1.fq
       readsfile2: SECH_2_2.fq
       source: matute
+      subgroups: [all,PopSec]
     - name: SECH3
       paired: True
       path: FASTQs/matuteSec/SECH3/
@@ -61,6 +69,7 @@ data_sets:
       readsfile1: SECH_3_1.fq
       readsfile2: SECH_3_2.fq
       source: matute
+      subgroups: [all,PopSec]
     - name: SECH4
       paired: True
       path: FASTQs/matuteSec/SECH4/
@@ -68,6 +77,7 @@ data_sets:
       readsfile1: SECH_4-sech_Anro_B5_TGACCA_L001_R1_001.fastq
       readsfile2: SECH_4-sech_Anro_B5_TGACCA_L001_R2_001.fastq
       source: matute
+      subgroups: [all,PopSec]
     - name: MD06m11d04y2010
       paired: True
       path: FASTQs/matuteSim/MD06m11d04y2010/
@@ -75,6 +85,7 @@ data_sets:
       readsfile1: MD06_11_04_2010_54_R1_001.fastq
       readsfile2: MD06_11_04_2010_54_R2_001.fastq
       source: matute
+      subgroups: [all,PopSim]
     - name: MD199m12d10y2010
       paired: True
       path: FASTQs/matuteSim/MD199m12d10y2010/
@@ -82,6 +93,7 @@ data_sets:
       readsfile1: MD199_12_10_2010_75_R1_001.fastq
       readsfile2: MD199_12_10_2010_75_R2_001.fastq
       source: matute
+      subgroups: [all,PopSim]
     - name: MD73m11d04y2010
       paired: True
       path: FASTQs/matuteSim/MD73m11d04y2010/
@@ -89,6 +101,7 @@ data_sets:
       readsfile1: MD73_11_04_2010_54_R1_001.fastq
       readsfile2: MD73_11_04_2010_54_R2_001.fastq
       source: matute
+      subgroups: [all,PopSim]
     - name: NS79m03d07y2011
       paired: True
       path: FASTQs/matuteSim/NS79m03d07y2011/
@@ -96,6 +109,7 @@ data_sets:
       readsfile1: NS79_03_07_2011_75_R1_001.fastq
       readsfile2: NS79_03_07_2011_75_R2_001.fastq
       source: matute
+      subgroups: [all,PopSim]
 
 
 reference_genomes:
