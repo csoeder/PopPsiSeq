@@ -74,7 +74,13 @@ filtration_stats <- inner_join(fastp_summary %>%  filter(type=="prefiltered" | t
 filtration_stats$type <- factor(filtration_stats$type, levels=c("prefiltered", "postfiltered"))
 
 pre_post_counts <- filtration_stats %>% filter(measure=='total_reads') %>%  group_by(type)  %>%  summarise(minimum = min(value), average=mean(value) , maximum = max(value)) 
-retention_percent <- filtration_stats %>% filter(measure=='total_reads') %>% select(c(name,type,value)) %>%  spread(type,value) %>% mutate(retention=100*postfiltered/prefiltered) %>%  summarise(type='percent retention', minimum = min(retention), average=mean(retention) , maximum = max(retention)) 
+
+#retention_percent <- filtration_stats %>% filter(measure=='total_reads') %>% select(c(name,type,value)) %>%  spread(type,value) %>% mutate(retention=100*postfiltered/prefiltered) %>%  summarise(type='percent retention', minimum = min(retention), average=mean(retention) , maximum = max(retention)) 
+
+# patch 13 Dec 2018: have to filter by subgroup now that it's a field in the YAML? 
+retention_percent <- filtration_stats %>% filter(measure=='total_reads') %>%  filter(subgroups=="all") %>% select(c(name,type,value)) %>%  spread(type,value) %>% mutate(retention=100*postfiltered/prefiltered) %>%  summarise(type='percent retention', minimum = min(retention), average=mean(retention) , maximum = max(retention)) 
+
+
 rbind(pre_post_counts, retention_percent) %>% kable()
 ```
 
@@ -657,14 +663,9 @@ chr2L.freqCompare.bg$sec_depletion_deltaF <- (chr2L.freqCompare.bg$exp_alt_af - 
 #tests to confirm this metric does what I think it does
 #chr2L.freqCompare.bg %>%  mcols() %>% as.tibble() %>% filter(sim_introg_deltaF < 0) %>%  View()
 
-autoplot(chr2L.freqCompare.bg, geom='point') + geom_point(aes(y=sim_introg_deltaF)) + theme_clear()
+autoplot(chr2L.freqCompare.bg, aes(y=sim_introg_deltaF), geom='point') + theme_clear()
 
 ```
-
-biocLite("HelloRanges")
-
-
-
 
 
 
@@ -676,6 +677,121 @@ cat meta/VCFs/all_samples.vs_droSim1.bwaUniq.summary.frq | tail -n +2 | cut -f 3
 
 Might multiallelic sites be of interest?
 
+
+## 14 Dec 2018
+
+
+Try windowing? Can always copy-paste the windowmaker and windowcounter rules from the PsiSeq2 snakefile. The question would be whether to do this within the R script or as part of the Snakemake workflow? 
+
+note that there are some extra columns in this particular GRange...
+
+```{bash eval=TRUE, echo=FALSE}
+bedtools  makewindows -g /proj/cdjones_lab/Genomics_Data_Commons/genomes/drosophila_simulans/droSim1.fa.fai -w 100000 > utils/droSim1_w100000_s100000.windows.bed
+
+
+```
+
+
+Writing a GRange object to a BED file...
+https://www.biostars.org/p/89341/
+
+```{r echo=FALSE}
+chr2L.freqCompare.df <- data.frame(seqnames=seqnames(chr2L.freqCompare.bg),
+  starts=start(chr2L.freqCompare.bg)-1,
+  ends=end(chr2L.freqCompare.bg),
+  names=c(rep(".", length(chr2L.freqCompare.bg))),
+  scores=c(rep(".", length(chr2L.freqCompare.bg))),
+  strands=strand(chr2L.freqCompare.bg)  )
+
+chr2L.freqCompare.df <- cbind(chr2L.freqCompare.df, mcols(chr2L.freqCompare.bg))
+
+
+write.table(chr2L.freqCompare.df, file="chr2L.freqCompare.bed", quote=F, sep="\t", row.names=F, col.names=F)
+
+```
+
+
+## 17 December 2018
+
+Idea: for each bin, calculate a population-wide heatmap/phylogeny base on SNP data. Animate via gganimate or gif?
+
+install.packages("devtools")
+devtools::install_github("dgrtwo/gganimate")
+install.packages("gifski")
+
+https://www.ggplot2-exts.org/gganimate.html
+https://www.rdocumentation.org/packages/gganimate/versions/0.1.1
+(check the cumulative = True setting.... use this for chromosomal location progress bar?? )
+https://stackoverflow.com/questions/51440496/using-gganimate-to-export-gif
+
+
+
+
+```{bash eval=FALSE, echo=FALSE}
+
+bedtools map -c 18,19,19 -o sum,sum,count -null NA -a utils/droSim1_w100000_s100000.windows.bed -b chr2L.freqCompare.bed  > {output.window_counts}
+```
+
+
+uh.... why does bedtools not find overlaps here?
+
+```{bash eval=TRUE, echo=FALSE}
+cat chr2L.freqCompare.bed | cut -f 1,2,3,6,18,19 | nl | tr -d " " | awk '{print $2,$3,$4,$1,"0",".",$6,$7}' | tr " " "\t" > chr2L.freqCompare.clean.bed 
+```
+
+uhhhhh
+
+```{bash eval=TRUE, echo=FALSE}
+cat utils/droSim1_w100000_s100000.windows.bed | grep -w "chr2L" > dev/droSim1_w100000_s100000.windows.chr2L.bed  
+
+```
+
+Ok, this gives results. Whatever. May be some sort of sorting issue? May go away totally using HelloRanges or a non-subsetted frq file? whatever, moving on for now...
+
+```{bash eval=TRUE, echo=FALSE}
+bedtools map -c 7,8,8 -o sum,sum,count -null NA -a dev/droSim1_w100000_s100000.windows.chr2L.bed -b chr2L.freqCompare.clean.bed > dev/chr2L.freqCompare.windowed.bed
+```
+
+
+
+```{r echo=FALSE}
+chr2L.freqCompare.windowed.bg <- import.bedGraph("dev/chr2L.freqCompare.windowed.bed", genome="droSim1")
+names(mcols(chr2L.freqCompare.windowed.bg)) <-  c("sum_sim_introg_deltaF", "sum_sec_depl_deltaF", "num_snp")
+
+chr2L.freqCompare.windowed.bg$avg_sim_introg <- chr2L.freqCompare.windowed.bg$sum_sim_introg_deltaF/chr2L.freqCompare.windowed.bg$num_snp
+chr2L.freqCompare.windowed.bg$avg_sec_depl <- chr2L.freqCompare.windowed.bg$sum_sec_depl_deltaF/chr2L.freqCompare.windowed.bg$num_snp
+
+
+chr2L.freqCompare.windowed.snpCount.tk <- autoplot(chr2L.freqCompare.windowed.bg, aes(y=num_snp), geom='line') + theme_clear()
+chr2L.freqCompare.windowed.simIntrog.tk <- autoplot(chr2L.freqCompare.windowed.bg, aes(y=avg_sim_introg), geom='line') + theme_clear()
+chr2L.freqCompare.windowed.secDeplet.tk <- autoplot(chr2L.freqCompare.windowed.bg, aes(y=avg_sec_depl), geom='line') + theme_clear()
+
+tks <- tracks( number_SNPs = chr2L.freqCompare.windowed.snpCount.tk, simulans_similarity = chr2L.freqCompare.windowed.simIntrog.tk, sechellia_dissimilarity = chr2L.freqCompare.windowed.secDeplet.tk )#,heights = c(2, 3, 3, 1, 4)) + theme_tracks_sunset()
+
+tks
+```
+
+http://www.sthda.com/english/wiki/ggbio-visualize-genomic-data
+
+Well that's nice and crisp, albeit with no comparison to control....
+
+Cleaning up 
+
+```{bash eval=FALSE, echo=FALSE}
+cat all_samples.chr2L.vs_droSim1.bwaUniq.vcf | grep -v "#" | sed -e 's/0\/0:\S*\(\s\|$\)/0\t/g'  | sed -e 's/0\/1:\S*\(\s\|$\)/1\t/g' | sed -e 's/1\/0:\S*\(\s\|$\)/1\t/g' | sed -e 's/1\/1:\S*\(\s\|$\)/2\t/g' | sed -e 's/\.:\S*\(\s\|$\)/NA\t/g' 
+
+```
+
+
+calculating a windowed distance matrix lends itself to the snakemake recursive workflow. (Look back at the human developmental RNA workflow for hints on building an n*n triangular matrix in Snakemake )
+
+
+
+
+
+
+
+biocLite("HelloRanges")
 
 
 

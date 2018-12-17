@@ -7,6 +7,22 @@ data_sets:
       readsfile2: SRR5860570_2.fastq
       source: NCBI
       subgroups: [all,control]
+    - name: SRR869587
+      paired: True
+      path: FASTQs/otherSec/SRR869587/
+      experimental: control
+      readsfile1: SRR869587_1.fastq
+      readsfile2: SRR869587_2.fastq
+      source: NCBI
+      subgroups: [all,control]
+    - name: SRR6426002
+      paired: True
+      path: FASTQs/otherSec/SRR6426002/
+      experimental: control
+      readsfile1: SRR6426002_1.fastq
+      readsfile2: SRR6426002_2.fastq
+      source: NCBI
+      subgroups: [all,control]
     - name: 10A
       paired: True
       path: FASTQs/2013/10A/

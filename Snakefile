@@ -6,10 +6,9 @@ sample_by_name = {c['name'] : c for c in config['data_sets']}
 ref_genome_by_name = { g['name'] : g for g in config['reference_genomes']}
 sampname_by_group = {}
 for s in sample_by_name.keys():
-	subgroup_str = sample_by_name[s]['subgroups']
-	subgroup_lst = subgroup_str.split(",")
+	subgroup_lst = sample_by_name[s]['subgroups']
 	for g in subgroup_lst:
-		if g in sampname_by_group.keys:
+		if g in sampname_by_group.keys():
 			sampname_by_group[g].append(s)
 		else:
 			sampname_by_group[g] = [s]
@@ -303,7 +302,63 @@ rule subset_VCF_to_subgroup:
 	message:
 		"Subsetting the variant file {input.vcf_in} to the individuals in the subgroup {wildcards.subgroup}.... "
 	run:
-		member_list = [samp]
+		member_list = "%s,"*len(sampname_by_group[wildcards.subgroup]) % tuple(sampname_by_group[wildcards.subgroup])
+		shell("vcf-subset {input.vcf_in} -u -c {member_list} | vcftools --min-alleles 2 --max-alleles 2  --max-missing-count 1  --vcf - --recode --stdout > {output.vcf_out}")
+
+
+
+rule window_maker:
+	output:
+		windowed='utils/{ref_genome}_w{window_size}_s{slide_rate}.windows.bed'
+	params:
+		runmem_gb=8,
+		runtime="5:00"
+	run:
+		fai_path = ref_genome_by_name[wildcards.ref_genome]['fai'],
+		shell("mkdir -p utils")
+		shell(
+			'bedtools makewindows -w {wildcards.window_size} -s {wildcards.slide_rate} -g {fai_path} -i winnum | bedtools sort -i - > {output.windowed}'
+		)
+
+
+rule pairwise_VCF_distance_metric_windowed:
+	input:
+		vcf_in="variants/{prefix}.vs_{ref_genome}.{aligner}.vcf",
+		windoze_in = "utils/droSim1_w100000_s100000.windows.bed" #generalize this
+	output:
+		pairdist_out = ["variants/{prefix}.vs_{ref_genome}.{aligner}/distances/{indiv_1}/{indiv_2}.windowPrefix.bed","variants/{prefix}.vs_{ref_genome}.{aligner}/distances/{indiv_2}/{indiv_1}.windowPrefix.bed"]
+	params:
+		runmem_gb=8,
+		runtime = "1:00:00",
+	run:
+		shell("""
+
+			mkdir -p variants/{wildcards.prefix}.vs_{wildcards.ref_genome}.{wildcards.aligner}/distances/{wildcards.indiv_1}/
+			mkdir -p variants/{wildcards.prefix}.vs_{wildcards.ref_genome}.{wildcards.aligner}/distances/{wildcards.indiv_2}/
+
+			bedtools map -a {windoze_in} -b <(vcf-subset all_samples.chr2L.vs_droSim1.bwaUniq.vcf -u -c {wildcards.indiv_1},{wildcards.indiv_2} | grep -v "#" | sed -e 's/0\/0:\S*\(\s\|$\)/0\t/g'  | sed -e 's/0\/1:\S*\(\s\|$\)/1\t/g' | sed -e 's/1\/0:\S*\(\s\|$\)/1\t/g' | sed -e 's/1\/1:\S*\(\s\|$\)/2\t/g' | sed -e 's/\.:\S*\(\s\|$\)/NA\t/g' |awk '{{print $1,$2,$2+1,0,0,"*",$10,$11,sqrt(($10-$11)^2)}}' | tr " " "\t" | grep -v NA ) -c 9,9 -o sum,count | awk '{{if($6>0)print $1,$2,$3,$4,$5/(2*$6) ;else print $1,$2,$3,$4,"NA"}}' | tr " " "\t" > {output.pairdist_out[0]}
+			cp {output.pairdist_out[0]} {output.pairdist_out[1]}
+
+			""")
+
+
+rule all_dist_to_indiv_by_group:
+	input:
+		groupies = lambda wildcards: expand("variants/{prefix}.vs_{ref_genome}.{aligner}/distances/{indiv}/{groupie}.windowPrefix.bed", prefix=wildcards.prefix, ref_genome=wildcards.ref_genome, aligner=wildcards.aligner, indiv=wildcards.indiv, groupie=sampname_by_group[wildcards.group]),
+	output:
+		group_dist = "variants/{prefix}.vs_{ref_genome}.{aligner}/distances/{indiv}/{group}.windowPrefix.tbl"
+	params:
+		runmem_gb=8,
+		runtime = "1:00:00",
+	run:
+		shell("touch {output.group_dist}.tmp")
+
+		for groupie in sampname_by_group[wildcards.group]:
+			shell("""cat variants/{wildcards.prefix}.vs_{wildcards.ref_genome}.{wildcards.aligner}/distances/{wildcards.indiv}/{groupie}.windowPrefix.bed | cut -f 5 | cat <(echo {groupie}) - | paste {output.group_dist}.tmp - > {output.group_dist} 
+					cp {output.group_dist} {output.group_dist}.tmp
+				""")
+		shell("""cat <(echo "chr\tstart\tstop\win") variants/{wildcards.prefix}.vs_{wildcards.ref_genome}.{wildcards.aligner}/distances/{wildcards.indiv}/{groupie}.windowPrefix.bed | cut -f 1-4 | paste - {output.group_dist}.tmp > {output.group_dist}""")
+
 
 
 rule write_report:
