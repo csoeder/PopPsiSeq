@@ -725,8 +725,6 @@ https://www.rdocumentation.org/packages/gganimate/versions/0.1.1
 https://stackoverflow.com/questions/51440496/using-gganimate-to-export-gif
 
 
-
-
 ```{bash eval=FALSE, echo=FALSE}
 
 bedtools map -c 18,19,19 -o sum,sum,count -null NA -a utils/droSim1_w100000_s100000.windows.bed -b chr2L.freqCompare.bed  > {output.window_counts}
@@ -786,10 +784,197 @@ cat all_samples.chr2L.vs_droSim1.bwaUniq.vcf | grep -v "#" | sed -e 's/0\/0:\S*\
 calculating a windowed distance matrix lends itself to the snakemake recursive workflow. (Look back at the human developmental RNA workflow for hints on building an n*n triangular matrix in Snakemake )
 
 
+## 18 Dec 2018
+
+hm, worried about the clobbering of distance matricies as written
+
+
+```{r echo=FALSE}
+#ordinarily this would come from the config file: 
+#	data_sets.df %>% filter(subroups == "all") %>% order_by(experimental/control/popSim)
+
+
+#all_droSim1_w100000_s100000 <- read_delim("dev/distances/10A/all.droSim1_w100000_s100000.tbl", "\t", escape_double = FALSE, trim_ws = TRUE)
+
+
+
+samp_list <- c("SECH1", "SECH2", "SECH3", "SECH4", "MD06m11d04y2010", "MD199m12d10y2010", "MD73m11d04y2010", "NS79m03d07y2011", "SRR5860570", "10A", "10B", "17A", "17B", "SRR303333")
+
+df_list <- vector("list", length(samp_list))
+i <- 1
+for (samp in samp_list) {
+	df.tmp <- read_delim(paste("dev/distances/", samp, "/all.droSim1_w100000_s100000.tbl", sep=""), "\t", escape_double = FALSE, trim_ws = TRUE)
+	df_list[[i]] <- df.tmp
+	i <- i+1
+}
+
+matt_list <- vector("list", max(df_list[[1]]$win))
+for (winnum in df_list[[1]]$win){
+#winnum <- 5
+	df.mat.tmp <- matrix(0, nrow=length(samp_list), ncol= length(samp_list))
+	 i <- 1
+for (samp in samp_list) {
+	df.mat.tmp[i,] <- df_list[[i]] %>% filter(win == winnum) %>% select(samp_list) %>% as.matrix()
+	i <- i+1
+	}
+
+	rownames(df.mat.tmp) <- samp_list
+	colnames(df.mat.tmp) <- samp_list
+	matt_list[[winnum]] <- df.mat.tmp
+}
+
+library(reshape2)
+
+melted_matt <- melt(matt_list[[122]])
+ggplot(data = melted_matt, aes(x=Var1, y=Var2, fill=1-value)) + geom_tile()+ scale_fill_gradient(limits=c(0.4,1))
+```
+
+http://www.sthda.com/english/wiki/ggplot2-quick-correlation-matrix-heatmap-r-software-and-data-visualization
+
+https://stackoverflow.com/questions/9206110/using-png-function-not-working-when-called-within-a-function
+
+```{r echo=FALSE}
 
 
 
 
+for (matt in seq(1,length(matt_list) )) {
+
+	print(matt)
+	melted_matt <- melt(matt_list[[matt]])
+	matt_plot<- ggplot(data = melted_matt, aes(x=Var1, y=Var2, fill=1-value)) + geom_tile()+ scale_fill_gradient(limits=c(0.2,1))
+	
+	
+	matt_plot
+	ggsave(file=paste("dev/heatmaps/",matt,".png", sep=""))
+}
+
+```
+
+
+big peaks in windows #122-123 and 179-180
+
+```{bash eval=FALSE, echo=FALSE}
+
+png_list=$(seq 1 221 | awk '{print "dev/heatmaps/"$1".png"}' | tr "\n" " ")
+convert -delay 35 -loop 1 $png_list dev/heatmaps/animated.gif
+```
+
+
+
+## 19 Dec 2018
+
+http://www.sthda.com/english/wiki/beautiful-dendrogram-visualizations-in-r-5-must-known-methods-unsupervised-machine-learning
+https://htmlpreview.github.io/?https://github.com/talgalili/dendextend/blob/master/inst/ignored/Introduction%20to%20dendextend.html
+
+
+```{r echo=FALSE}
+#install.packages("ggdendro")
+library("ggdendro")
+#install.packages("dendextend")
+library("dendextend")
+```
+
+```{r echo=FALSE}
+matt<-122
+matty <- matt_list[[matt]]
+denny <- hclust(matty %>%  as.dist()) %>% as.dendrogram() 
+leafList<-denny %>% get_leaves_attr("label")
+
+data_sets.df.tmp <- data_sets.df %>%  filter(subgroups=='all')
+data_sets.df.tmp <- data_sets.df.tmp[match(leafList, data_sets.df.tmp$name),]
+
+data_sets.df.tmp$label <- data_sets.df.tmp$experimental %>% as.character()
+data_sets.df.tmp$label[is.na(data_sets.df.tmp$label)] <-  data_sets.df.tmp$species[is.na(data_sets.df.tmp$label)] %>% as.character()
+data_sets.df.tmp$label <- as.factor(data_sets.df.tmp$label)
+levels(data_sets.df.tmp$label) <- list(`dark cyan`="selection", magenta="control", orange="drosophila sechellia", black="drosophila simulans")
+
+
+denny %>% set("labels_col",data_sets.df.tmp$label %>% as.character()) %>%  hang.dendrogram(hang_height = .25) %>% set("leaves_col", data_sets.df.tmp$label %>% as.character()) %>%  set("leaves_pch", 19) %>% set("leaves_cex", 2)  %>% as.ggdend() %>% ggplot() + ylim(c(-2,2))
+```
+
+
+
+
+```{r echo=FALSE}
+
+data_sets.df.tmp <- data_sets.df %>%  filter(subgroups=='all')
+
+data_sets.df.tmp$label <- data_sets.df.tmp$experimental %>% as.character()
+data_sets.df.tmp$label[is.na(data_sets.df.tmp$label)] <-  data_sets.df.tmp$species[is.na(data_sets.df.tmp$label)] %>% as.character()
+data_sets.df.tmp$label <- as.factor(data_sets.df.tmp$label)
+levels(data_sets.df.tmp$label) <- list(`dark cyan`="selection", magenta="control", orange="drosophila sechellia", black="drosophila simulans")
+
+for (matt in seq(1,length(matt_list) )) {
+
+	print(matt)
+
+	matty <- matt_list[[matt]]
+	denny <- hclust(matty %>%  as.dist()) %>% as.dendrogram() 	
+	leafList<-denny %>% get_leaves_attr("label")
+
+
+	data_sets.df.tmp <- data_sets.df.tmp[match(leafList, data_sets.df.tmp$name),]
+
+	denny_plot <- denny %>% set("labels_col",data_sets.df.tmp$label %>% as.character()) %>%  hang.dendrogram(hang_height = .25) %>% set("leaves_col", data_sets.df.tmp$label %>% as.character()) %>%  set("leaves_pch", 19) %>% set("leaves_cex", 2)  %>% as.ggdend() %>% ggplot() + ylim(c(-2,2))
+	
+	denny_plot
+	ggsave(file=paste("dev/phylotree/",matt,".png", sep=""))
+}
+
+
+```
+
+
+
+
+```{r echo=FALSE}
+#install.packages("gridExtra")
+#install.packages("cowplot")
+library("gridExtra")
+library("cowplot")
+library("grid")
+
+```
+
+
+Thank you for your service, Antonio Miguel de Jesus Dominigues
+https://support.bioconductor.org/p/68650/
+
+```{r echo=FALSE}
+chr2L.freqCompare.windowed.bg$winnum <- seq(1,221)
+
+
+for (matt in seq(1,length(matt_list) )) {
+
+	print(matt)
+
+	matty <- matt_list[[matt]]
+	
+	melted_matt <- melt(matt_list[[matt]])
+	matt_plot<- ggplot(data = melted_matt, aes(x=Var1, y=Var2, fill=1-value)) + geom_tile()+ scale_fill_gradient(limits=c(0.2,1))+ theme_clear()+ theme(legend.position="none") + labs(x="", y="")
+	
+	denny <- hclust(matty %>%  as.dist()) %>% as.dendrogram() 	
+	leafList<-denny %>% get_leaves_attr("label")
+
+	data_sets.df.tmp <- data_sets.df.tmp[match(leafList, data_sets.df.tmp$name),]
+
+	denny_plot <- denny %>% set("labels_col",data_sets.df.tmp$label %>% as.character()) %>%  hang.dendrogram(hang_height = .25) %>% set("leaves_col", data_sets.df.tmp$label %>% as.character()) %>%  set("leaves_pch", 19) %>% set("leaves_cex", 2)  %>% as.ggdend() %>% ggplot() + ylim(c(-2,2))
+	
+
+	
+	chr2L.freqCompare.windowed.simIntrog.tk.tmp <- autoplot(chr2L.freqCompare.windowed.bg, aes(y=avg_sim_introg), geom='line') + geom_point(aes(y=avg_sim_introg, alpha=as.factor(winnum==matt)), color="red") + scale_alpha_discrete(range=c(0,1))+ theme_clear()+ theme(legend.position="none")
+	
+	gee.tmp<-grid.arrange(chr2L.freqCompare.windowed.simIntrog.tk.tmp@ggplot, matt_plot, denny_plot, nrow = 2, layout_matrix = cbind(c(1,2), c(1,3)))
+	
+ ggsave(plot=gee.tmp, file=paste("dev/chr2Lflyby/",matt,".png", sep=""))
+
+ }
+
+
+
+
+```
 
 biocLite("HelloRanges")
 

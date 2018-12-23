@@ -62,6 +62,13 @@ data_sets:
       readsfile: SRR303333.fastq
       source: EarlyJones2011
       subgroups: [all,selection]
+    - name: Denis124
+      paired: False
+      path: FASTQs/matuteSec/Denis124/
+      species: drosophila sechellia
+      readsfile1: Denis124_R1_001.fastq
+      source: matute
+      subgroups: [all,PopSec]
     - name: SECH1
       paired: True
       path: FASTQs/matuteSec/SECH1/
@@ -126,7 +133,14 @@ data_sets:
       readsfile2: NS79_03_07_2011_75_R2_001.fastq
       source: matute
       subgroups: [all,PopSim]
-
+    - name: MD63m09d07y2010
+      paired: True
+      path: FASTQs/matuteSim/NS79m03d07y2011/
+      species: drosophila simulans
+      readsfile1: NS79_03_07_2011_75_R1_001.fastq
+      readsfile2: NS79_03_07_2011_75_R2_001.fastq
+      source: matute
+      subgroups: [all,PopSim]
 
 reference_genomes:
     - name: droSim1

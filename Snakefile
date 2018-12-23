@@ -321,44 +321,67 @@ rule window_maker:
 		)
 
 
+
+
+
+#######		Calculating VCF-based distance metric by windowed 	####
+
 rule pairwise_VCF_distance_metric_windowed:
 	input:
 		vcf_in="variants/{prefix}.vs_{ref_genome}.{aligner}.vcf",
-		windoze_in = "utils/droSim1_w100000_s100000.windows.bed" #generalize this
+		windoze_in = "utils/{window_prefix}.windows.bed" #generalize this
 	output:
-		pairdist_out = ["variants/{prefix}.vs_{ref_genome}.{aligner}/distances/{indiv_1}/{indiv_2}.windowPrefix.bed","variants/{prefix}.vs_{ref_genome}.{aligner}/distances/{indiv_2}/{indiv_1}.windowPrefix.bed"]
+		pairdist_out = ["variants/{prefix}.vs_{ref_genome}.{aligner}/distances/{indiv_1}/{indiv_2}.{window_prefix}.bed","variants/{prefix}.vs_{ref_genome}.{aligner}/distances/{indiv_2}/{indiv_1}.{window_prefix}.bed"]
 	params:
-		runmem_gb=8,
+		runmem_gb=16,
 		runtime = "1:00:00",
 	run:
-		shell("""
-
+		shell(
+			"""
 			mkdir -p variants/{wildcards.prefix}.vs_{wildcards.ref_genome}.{wildcards.aligner}/distances/{wildcards.indiv_1}/
-			mkdir -p variants/{wildcards.prefix}.vs_{wildcards.ref_genome}.{wildcards.aligner}/distances/{wildcards.indiv_2}/
-
-			bedtools map -a {windoze_in} -b <(vcf-subset all_samples.chr2L.vs_droSim1.bwaUniq.vcf -u -c {wildcards.indiv_1},{wildcards.indiv_2} | grep -v "#" | sed -e 's/0\/0:\S*\(\s\|$\)/0\t/g'  | sed -e 's/0\/1:\S*\(\s\|$\)/1\t/g' | sed -e 's/1\/0:\S*\(\s\|$\)/1\t/g' | sed -e 's/1\/1:\S*\(\s\|$\)/2\t/g' | sed -e 's/\.:\S*\(\s\|$\)/NA\t/g' |awk '{{print $1,$2,$2+1,0,0,"*",$10,$11,sqrt(($10-$11)^2)}}' | tr " " "\t" | grep -v NA ) -c 9,9 -o sum,count | awk '{{if($6>0)print $1,$2,$3,$4,$5/(2*$6) ;else print $1,$2,$3,$4,"NA"}}' | tr " " "\t" > {output.pairdist_out[0]}
-			cp {output.pairdist_out[0]} {output.pairdist_out[1]}
-
-			""")
-
+			bedtools map -a {input.windoze_in} -b <(vcf-subset {input.vcf_in} -u -c {wildcards.indiv_1},{wildcards.indiv_2} | grep -v "#" | sed -e 's/0\/0:\S*\(\s\|$\)/0\t/g'  | sed -e 's/0\/1:\S*\(\s\|$\)/1\t/g' | sed -e 's/1\/0:\S*\(\s\|$\)/1\t/g' | sed -e 's/1\/1:\S*\(\s\|$\)/2\t/g' | sed -e 's/\.:\S*\(\s\|$\)/NA\t/g' |awk '{{print $1,$2,$2+1,0,0,"*",$10,$11,sqrt(($10-$11)^2)}}' | tr " " "\t" | grep -v NA ) -c 9,9 -o sum,count | awk '{{if($6>0)print $1,$2,$3,$4,$5/(2*$6) ;else print $1,$2,$3,$4,"NA"}}' | tr " " "\t" > {output.pairdist_out[0]}
+			"""
+			)
+		if len(set(output.pairdist_out)) > 1:
+			shell(
+				"""
+				mkdir -p variants/{wildcards.prefix}.vs_{wildcards.ref_genome}.{wildcards.aligner}/distances/{wildcards.indiv_2}/
+				cp {output.pairdist_out[0]} {output.pairdist_out[1]}
+				"""
+				)
+# 			hmm..... maybe wrap that one-liner up in a different script?
+#all_samples.chr2L.vs_droSim1.bwaUniq.vcf
 
 rule all_dist_to_indiv_by_group:
 	input:
-		groupies = lambda wildcards: expand("variants/{prefix}.vs_{ref_genome}.{aligner}/distances/{indiv}/{groupie}.windowPrefix.bed", prefix=wildcards.prefix, ref_genome=wildcards.ref_genome, aligner=wildcards.aligner, indiv=wildcards.indiv, groupie=sampname_by_group[wildcards.group]),
+		groupies = lambda wildcards: expand("variants/{prefix}.vs_{ref_genome}.{aligner}/distances/{indiv}/{groupie}.{window_prefix}.bed", prefix=wildcards.prefix, ref_genome=wildcards.ref_genome, aligner=wildcards.aligner, indiv=wildcards.indiv, groupie=sampname_by_group[wildcards.group], window_prefix=wildcards.window_prefix),
 	output:
-		group_dist = "variants/{prefix}.vs_{ref_genome}.{aligner}/distances/{indiv}/{group}.windowPrefix.tbl"
+		group_dist = "variants/{prefix}.vs_{ref_genome}.{aligner}/distances/{indiv}/{group}.{window_prefix}.tbl"
 	params:
 		runmem_gb=8,
-		runtime = "1:00:00",
+		runtime = "10:00",
 	run:
 		shell("touch {output.group_dist}.tmp")
 
 		for groupie in sampname_by_group[wildcards.group]:
-			shell("""cat variants/{wildcards.prefix}.vs_{wildcards.ref_genome}.{wildcards.aligner}/distances/{wildcards.indiv}/{groupie}.windowPrefix.bed | cut -f 5 | cat <(echo {groupie}) - | paste {output.group_dist}.tmp - > {output.group_dist} 
+			shell("""cat variants/{wildcards.prefix}.vs_{wildcards.ref_genome}.{wildcards.aligner}/distances/{wildcards.indiv}/{groupie}.{wildcards.window_prefix}.bed | cut -f 5 | cat <(echo {groupie}) - | paste {output.group_dist}.tmp - > {output.group_dist} 
 					cp {output.group_dist} {output.group_dist}.tmp
-				""")
-		shell("""cat <(echo "chr\tstart\tstop\win") variants/{wildcards.prefix}.vs_{wildcards.ref_genome}.{wildcards.aligner}/distances/{wildcards.indiv}/{groupie}.windowPrefix.bed | cut -f 1-4 | paste - {output.group_dist}.tmp > {output.group_dist}""")
+					""")
+		shell("""cat <(echo "chr\tstart\tstop\twin") variants/{wildcards.prefix}.vs_{wildcards.ref_genome}.{wildcards.aligner}/distances/{wildcards.indiv}/{groupie}.{wildcards.window_prefix}.bed | cut -f 1-4 | paste - {output.group_dist}.tmp > {output.group_dist}""")
+		shell("rm {output.group_dist}.tmp")
 
+rule group2group_VCF_distance:
+	input:
+		tables_in = lambda wildcards: expand("variants/{prefix}.vs_{ref_genome}.{aligner}/distances/{indiv}/{group2}.{window_prefix}.tbl", prefix=wildcards.prefix, ref_genome=wildcards.ref_genome, aligner=wildcards.aligner, group2=wildcards.group2, indiv=sampname_by_group[wildcards.group1], window_prefix=wildcards.window_prefix)
+	output:
+		roster_out = "variants/{prefix}.vs_{ref_genome}.{aligner}/distances/from.{group1}.to.{group2}.{window_prefix}.distanceRoster"
+	params:
+		runmem_gb=1,
+		runtime = "1:00",
+	shell:
+		"""echo {input.tables_in} | tr " " "\n" > {output.roster_out}"""
+
+############################################################
 
 
 rule write_report:
