@@ -148,7 +148,7 @@ rule bwa_align:
 		bam_out = "mapped_reads/{sample}.vs_{ref_genome}.bwa.sort.bam",
 	params:
 		runmem_gb=64,
-		runtime="12:00:00",
+		runtime="64:00:00",
 	message:
 		"aligning reads from {wildcards.sample} to reference_genome {wildcards.ref_genome} .... "
 	run:
@@ -232,7 +232,7 @@ rule joint_vcf_caller:
 		runmem_gb=32,
 		runtime="96:00:00",
 	message:
-		"Jointly calling variants from all samples mapped to {wildcards.ref_genome} with {wildcards.aligner}"
+		"Jointly calling variants from all samples mapped to \ {wildcards.ref_genome} \ with \ {wildcards.aligner} \ "
 	run:
 		ref_genome_file=ref_genome_by_name[wildcards.ref_genome]['path']
 		shell("freebayes {params.freebayes} -f {ref_genome_file} {input.bams_in} | vcftools --remove-indels --vcf - --recode --recode-INFO-all --stdout  > {output.vcf_out}")
@@ -246,7 +246,8 @@ rule vcf_reporter:
 	input:
 		vcf_in = "variants/{prefix}.vs_{ref_genome}.{aligner}.vcf"
 	output:
-		report_out = "meta/VCFs/{prefix}.vs_{ref_genome}.{aligner}.summary"
+		report_out = "meta/VCFs/{prefix}.vs_{ref_genome}.{aligner}.summary",
+		frq_out = "meta/VCFs/{prefix}.vs_{ref_genome}.{aligner}.summary.frq"
 	params:
 		runmem_gb=8,
 		runtime="4:00:00",
@@ -300,7 +301,7 @@ rule subset_VCF_to_subgroup:
 		runmem_gb=8,
 		runtime = "1:00:00",
 	message:
-		"Subsetting the variant file {input.vcf_in} to the individuals in the subgroup {wildcards.subgroup}.... "
+		"Subsetting the variant file \ {input.vcf_in} \ to the individuals in the subgroup \ {wildcards.subgroup} \ .... "
 	run:
 		member_list = "%s,"*len(sampname_by_group[wildcards.subgroup]) % tuple(sampname_by_group[wildcards.subgroup])
 		shell("vcf-subset {input.vcf_in} -u -c {member_list} | vcftools --min-alleles 2 --max-alleles 2  --max-missing-count 1  --vcf - --recode --stdout > {output.vcf_out}")
@@ -320,6 +321,85 @@ rule window_maker:
 			'bedtools makewindows -w {wildcards.window_size} -s {wildcards.slide_rate} -g {fai_path} -i winnum | bedtools sort -i - > {output.windowed}'
 		)
 
+
+
+#######		windowed frequency comparison between groups 	#######################
+
+rule clean_groupFreqs:
+	input:
+		#vcf_in = "variants/{prefix}.subset_{grup}.vs_{ref_genome}.{aligner}.vcf",
+		frq_in = "meta/VCFs/{prefix}.subset_{grup}.vs_{ref_genome}.{aligner}.summary.frq"
+	output:
+		frq_out = "variant_analysis/freqs/{prefix}.subset_{grup}.vs_{ref_genome}.{aligner}.frq",
+	params:
+		runmem_gb=16,
+		runtime="15:00"
+	shell:
+		"""
+		mkdir -p variant_analysis/freqs/
+		tail -n +2 {input.frq_in}  | awk '{{print $1,$2,$2+1,$4,$5,$6}}' | tr " " "\t" > {output.frq_out}
+		"""
+
+
+rule calc_frq_shift:
+	input:
+		par1_frq = "variant_analysis/freqs/{prefix}.subset_{grup_par1}.vs_{ref_genome}.{aligner}.frq",
+		par2_frq = "variant_analysis/freqs/{prefix}.subset_{grup_par2}.vs_{ref_genome}.{aligner}.frq",
+		off_frq = "variant_analysis/freqs/{prefix}.subset_{grup_off}.vs_{ref_genome}.{aligner}.frq",
+	output:
+		frqShft_out = "variant_analysis/freqShift/{prefix}.{grup_off}_with_{grup_par1}_and_{grup_par2}.vs_{ref_genome}.{aligner}.frqShift"
+	params:
+		runmem_gb=16,
+		runtime="1:00:00"
+	shell:
+		"""
+		mkdir -p variant_analysis/freqShift/
+		bedtools intersect -wa -wb -a {input.par1_frq} -b  {input.par2_frq} | bedtools intersect -wa -wb -a - -b  {input.off_frq} | cut -f 1,2,4-6,10,12,16,18 | tr ":" "\t" | awk '{{print $1,$2,$2+1,"0","0","+",$4,$6,$3,$7,$8,$10,$11,$13}}' | tr " " "\t" > {output.frqShft_out}.pre
+		Rscript scripts/freqShifter.R {output.frqShft_out}.pre {output.frqShft_out}
+		"""
+		#Rscript scripts/freqShifter.R {output.frqShft_out}.pre {output.frqShft_out}
+
+#	no need for biallelic check - that's done in the subsetting
+
+#	add a check to make sure that it's the same allele in each case, write down the cases which aren't????
+
+
+
+rule window_frq_shift:
+	input:
+		frqShft_in = "variant_analysis/freqShift/{frqshft_prefix}.vs_{ref_genome}.{aligner}.frqShift",
+		windows_in = "utils/{ref_genome}_w{window_size}_s{slide_rate}.windows.bed"
+	output:
+		windowed_out = "variant_analysis/freqShift/{frqshft_prefix}.vs_{ref_genome}.{aligner}.windowed_w{window_size}_s{slide_rate}.frqShift"
+	params:
+		runmem_gb=16,
+		runtime="1:00:00"
+	shell:
+
+
+
+
+
+
+#cat utils/droSim1_w100000_s100000.windows.bed | grep -w "chr2L" > dev/droSim1_w100000_s100000.windows.chr2L.bed  
+
+#vcftools  --vcf PopSech.chr2L.vs_droSim1.bwaUniq.vcf --stdout --freq 
+#vcftools  --vcf PopSim.chr2L.vs_droSim1.bwaUniq.vcf --out PopSim.chr2L.vs_droSim1.bwaUniq --freq 
+#vcftools  --vcf selection.chr2L.vs_droSim1.bwaUniq.vcf --out selection.chr2L.vs_droSim1.bwaUniq --freq 
+
+
+#bedtools intersect -wa -wb -a <(cat PopSech.chr2L.vs_droSim1.bwaUniq.frq | tail -n +2 | awk '{print $1,$2,$2+1,$4,$5,$6}' | tr " " "\t") -b <(cat PopSim.chr2L.vs_droSim1.bwaUniq.frq | tail -n +2 | awk '{print $1,$2,$2+1,$4,$5,$6}' | tr " " "\t") | bedtools intersect -wa -wb -a - -b <(cat selection.chr2L.vs_droSim1.bwaUniq.frq | tail -n +2 | awk '{print $1,$2,$2+1,$4,$5,$6}' | tr " " "\t") | cut -f 1,2,4-6,10,12,16,18 | tr ":" "\t" | awk '{print $1,$2,$2+1,"0","0","+",$4,$6,$3,$7,$8,$10,$11,$13}' | tr " " "\t" > dev/grouped_freaks2.bed
+
+
+#*.bwaUniq.frq ---> grouped_freaks2
+
+#( dev/grouped_freaks2.bed --> R script --> chr2L.freqCompare.bed)
+
+#cat chr2L.freqCompare.bed | cut -f 1,2,3,6,18,19 | nl | tr -d " " | awk '{print $2,$3,$4,$1,"0",".",$6,$7}' | tr " " "\t" > chr2L.freqCompare.clean.bed 
+
+#bedtools map -c 7,8,8 -o sum,sum,count -null NA -a dev/droSim1_w100000_s100000.windows.chr2L.bed -b chr2L.freqCompare.clean.bed > dev/chr2L.freqCompare.windowed.bed
+
+############################################################################  
 
 
 

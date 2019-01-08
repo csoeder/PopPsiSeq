@@ -66,7 +66,7 @@ data_sets:
       paired: False
       path: FASTQs/matuteSec/Denis124/
       species: drosophila sechellia
-      readsfile1: Denis124_R1_001.fastq
+      readsfile: Denis124_R1_001.fastq
       source: matute
       subgroups: [all,PopSec]
     - name: SECH1

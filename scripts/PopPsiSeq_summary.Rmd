@@ -20,6 +20,7 @@ knitr::opts_knit$set(root.dir='/Users/csoeder/Research/PSIseq/PopPsiSeq/')
 library("tidyverse")
 library("knitr")
 library("yaml")
+library("ggbio")
 #library("sitools")
 
 # gotta set the working directory.....

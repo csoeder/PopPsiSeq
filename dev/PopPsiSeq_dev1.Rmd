@@ -8,13 +8,14 @@ output:
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE, error = TRUE, python.reticulate=F)
 #knitr::opts_chunk$set(root.dir = '/Users/csoeder/Research/PSIseq/PopPsiSeq/')
 knitr::opts_knit$set(root.dir='/Users/csoeder/Research/PSIseq/PopPsiSeq/')
 #knitr::opts_knit$set(root.dir='/proj/cdjones_lab/csoeder/PopPsiSeq/')
+
 library("tidyverse")
 library("knitr")
-
+library("reticulate")
 
 ```
 
@@ -565,7 +566,7 @@ bedtools intersect -wa -wb -a <(cat PopSech.frq | tail -n +2 | awk '{print $1,$2
 ```
 
 
-```{r echo=FALSE}
+```{r echo=FALSE, include=FALSE}
 
 grouped_freaks <- read_delim("dev/grouped_freaks.dat", "\t", escape_double = FALSE, col_names = FALSE, trim_ws = TRUE)
 names(grouped_freaks) <- c("chrom", "pos", "ref", "alt", "sec_count", "sec_alt_af", "sim_count", "sim_alt_af","exp_count", "exp_alt_af")
@@ -617,6 +618,7 @@ for s in sample_by_name.keys():
 #	......
 #
 
+
 rule subset_VCF_to_subgroup:
 	input:
 		vcf_in = "variants/{prefix}.vs_{ref_genome}.{aligner}.vcf"
@@ -644,7 +646,7 @@ bedtools intersect -wa -wb -a <(cat PopSech.chr2L.vs_droSim1.bwaUniq.frq | tail 
 
 
 
-```{r echo=FALSE}
+```{r echo=FALSE, include=FALSE}
 
 library("rtracklayer")
 #source("http://bioconductor.org/biocLite.R")
@@ -662,7 +664,8 @@ chr2L.freqCompare.bg$sec_depletion_deltaF <- (chr2L.freqCompare.bg$exp_alt_af - 
 
 #tests to confirm this metric does what I think it does
 #chr2L.freqCompare.bg %>%  mcols() %>% as.tibble() %>% filter(sim_introg_deltaF < 0) %>%  View()
-
+```
+```{r echo=FALSE}
 autoplot(chr2L.freqCompare.bg, aes(y=sim_introg_deltaF), geom='point') + theme_clear()
 
 ```
@@ -720,12 +723,14 @@ devtools::install_github("dgrtwo/gganimate")
 install.packages("gifski")
 
 https://www.ggplot2-exts.org/gganimate.html
+
 https://www.rdocumentation.org/packages/gganimate/versions/0.1.1
 (check the cumulative = True setting.... use this for chromosomal location progress bar?? )
+
 https://stackoverflow.com/questions/51440496/using-gganimate-to-export-gif
 
 
-```{bash eval=FALSE, echo=FALSE}
+```{bash eval=FALSE, echo=FALSE, include=FALSE}
 
 bedtools map -c 18,19,19 -o sum,sum,count -null NA -a utils/droSim1_w100000_s100000.windows.bed -b chr2L.freqCompare.bed  > {output.window_counts}
 ```
@@ -733,20 +738,20 @@ bedtools map -c 18,19,19 -o sum,sum,count -null NA -a utils/droSim1_w100000_s100
 
 uh.... why does bedtools not find overlaps here?
 
-```{bash eval=TRUE, echo=FALSE}
+```{bash eval=FALSE, echo=FALSE}
 cat chr2L.freqCompare.bed | cut -f 1,2,3,6,18,19 | nl | tr -d " " | awk '{print $2,$3,$4,$1,"0",".",$6,$7}' | tr " " "\t" > chr2L.freqCompare.clean.bed 
 ```
 
 uhhhhh
 
-```{bash eval=TRUE, echo=FALSE}
+```{bash eval=FALSE, echo=FALSE, include=FALSE}
 cat utils/droSim1_w100000_s100000.windows.bed | grep -w "chr2L" > dev/droSim1_w100000_s100000.windows.chr2L.bed  
 
 ```
 
 Ok, this gives results. Whatever. May be some sort of sorting issue? May go away totally using HelloRanges or a non-subsetted frq file? whatever, moving on for now...
 
-```{bash eval=TRUE, echo=FALSE}
+```{bash eval=FALSE, echo=TRUE}
 bedtools map -c 7,8,8 -o sum,sum,count -null NA -a dev/droSim1_w100000_s100000.windows.chr2L.bed -b chr2L.freqCompare.clean.bed > dev/chr2L.freqCompare.windowed.bed
 ```
 
@@ -833,7 +838,7 @@ http://www.sthda.com/english/wiki/ggplot2-quick-correlation-matrix-heatmap-r-sof
 
 https://stackoverflow.com/questions/9206110/using-png-function-not-working-when-called-within-a-function
 
-```{r echo=FALSE}
+```{r echo=FALSE, eval=FALSE }
 
 
 
@@ -938,10 +943,10 @@ library("grid")
 ```
 
 
-Thank you for your service, Antonio Miguel de Jesus Dominigues
+Thank you for your service, Antonio Miguel de Jesus Dominigues, re: ggbio@ggplot call
 https://support.bioconductor.org/p/68650/
 
-```{r echo=FALSE}
+```{r echo=FALSE, eval=FALSE}
 chr2L.freqCompare.windowed.bg$winnum <- seq(1,221)
 
 
@@ -975,6 +980,25 @@ for (matt in seq(1,length(matt_list) )) {
 
 
 ```
+
+## 8 Jan 2019
+
+working on reflowing the frequency shift code into snakemake. Some manipulations done via bedtools & vcftools, others will be in a standalone R script (include in the summary PDF?)
+
+https://www.r-bloggers.com/passing-arguments-to-an-r-script-from-command-lines/
+
+```{r eval=FALSE}
+args = commandArgs(trailingOnly=TRUE)
+print(args[1])
+print(args[2])
+```
+
+```{bash eval=FALSE}
+Rscript scripts/freqShifter.R potato tomato
+```
+
+
+
 
 biocLite("HelloRanges")
 
