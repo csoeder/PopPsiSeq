@@ -357,13 +357,9 @@ rule calc_frq_shift:
 		bedtools intersect -wa -wb -a {input.par1_frq} -b  {input.par2_frq} | bedtools intersect -wa -wb -a - -b  {input.off_frq} | cut -f 1,2,4-6,10,12,16,18 | tr ":" "\t" | awk '{{print $1,$2,$2+1,"0","0","+",$4,$6,$3,$7,$8,$10,$11,$13}}' | tr " " "\t" > {output.frqShft_out}.pre
 		Rscript scripts/freqShifter.R {output.frqShft_out}.pre {output.frqShft_out}
 		"""
-		#Rscript scripts/freqShifter.R {output.frqShft_out}.pre {output.frqShft_out}
 
 #	no need for biallelic check - that's done in the subsetting
-
 #	add a check to make sure that it's the same allele in each case, write down the cases which aren't????
-
-
 
 rule window_frq_shift:
 	input:
@@ -375,10 +371,9 @@ rule window_frq_shift:
 		runmem_gb=16,
 		runtime="1:00:00"
 	shell:
-
-
-
-
+		"""
+		bedtools map -c 7,8,8 -o sum,sum,count -null NA -a {input.windows_in} -b <( tail -n +2  {input.frqShft_in} | cut -f  1-3,15,16 | nl | tr -d " " | awk '{{print $2,$3,$4,$1,"0",".",$5,$6}}' | tr " " "\t"| bedtools sort -i - ) > {output.windowed_out}
+  		"""
 
 
 #cat utils/droSim1_w100000_s100000.windows.bed | grep -w "chr2L" > dev/droSim1_w100000_s100000.windows.chr2L.bed  
@@ -470,6 +465,7 @@ rule write_report:
 		sequenced_reads_summary=["meta/sequenced_reads.dat"],
 		alignment_summaries = expand("meta/alignments.vs_{ref_genome}.{aligner}.summary", ref_genome=['droSim1', 'droSec1'], aligner=['bwa','bwaUniq']),
 		full_variant_summary = expand("meta/{prefix}.calledVariants.{aligner}.summary", aligner=["bwaUniq"], prefix=["all_samples"] ),
+		windowed_frq_shifts = expand("variant_analysis/freqShift/all_samples.{treat}_with_PopSec_and_PopSim.vs_droSim1.bwaUniq.windowed_w100000_s100000.frqShift", treat = ['selection','control']),
 	output:
 		pdf_out="thingy.pdf"
 	params:
