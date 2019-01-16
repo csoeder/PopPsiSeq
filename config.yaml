@@ -23,6 +23,13 @@ data_sets:
       readsfile2: SRR6426002_2.fastq
       source: NCBI
       subgroups: [all,control]
+    - name: SRR7697345
+      paired: False
+      path: FASTQs/otherSec/SRR7697345/
+      experimental: control
+      readsfile: SRR7697345.fastq
+      source: NCBI
+      subgroups: [all,control]
     - name: 10A
       paired: True
       path: FASTQs/2013/10A/
@@ -37,6 +44,22 @@ data_sets:
       experimental: selection
       readsfile1: 10B_BC15_F_TGACCA_L006_R1_001.fastq
       readsfile2: 10B_BC15_F_TGACCA_L006_R2_001.fastq
+      source: EarlyJones2013
+      subgroups: [all,selection]
+    - name: 13A
+      paired: True
+      path: FASTQs/2013/13A/
+      experimental: selection
+      readsfile1: 13A_BC15_F_ACAGTG_L006_R1_001.fastq
+      readsfile2: 13A_BC15_F_ACAGTG_L006_R2_001.fastq
+      source: EarlyJones2013
+      subgroups: [all,selection]
+    - name: 13B
+      paired: True
+      path: FASTQs/2013/13B/
+      experimental: selection
+      readsfile1: 13B_BC15_F_GCCAAT_L006_R1_001.fastq
+      readsfile2: 13B_BC15_F_GCCAAT_L006_R2_001.fastq
       source: EarlyJones2013
       subgroups: [all,selection]
     - name: 17A
@@ -67,6 +90,20 @@ data_sets:
       path: FASTQs/matuteSec/Denis124/
       species: drosophila sechellia
       readsfile: Denis124_R1_001.fastq
+      source: matute
+      subgroups: [all,PopSec]
+    - name: DenisAT3
+      paired: False
+      path: FASTQs/matuteSec/DenisAT3/
+      species: drosophila sechellia
+      readsfile: DenisAT3_R1_001.fastq
+      source: matute
+      subgroups: [all,PopSec]
+    - name: DenisNoni10
+      paired: False
+      path: FASTQs/matuteSec/DenisNoni10/
+      species: drosophila sechellia
+      readsfile: DenisNoni10_R1_001.fastq
       source: matute
       subgroups: [all,PopSec]
     - name: SECH1

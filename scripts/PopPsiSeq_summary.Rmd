@@ -287,9 +287,7 @@ all_samples.calledVariants.snpCount <- inner_join(all_samples.calledVariants.sum
 ```
 
 ```{r echo=FALSE}
-
 all_samples.calledVariants.snpCount %>%  mutate(snp_rate=1000*total_snp_count/number_bases, total_snp_count=human_readable_croncher(total_snp_count), number_bases=human_readable_croncher(number_bases) ) %>% select(-c(group)) %>% select(c(refGenome, number_bases, total_snp_count, snp_rate)) %>% rename(`reference genome` = refGenome,`Genome size (bp)`=number_bases, `total SNP count`=total_snp_count, `SNPs per kB`=snp_rate) %>% kable(caption="SNP count and per-KB SNP rate across all samples", digits=1)
-
 
 ```
 
@@ -311,7 +309,6 @@ nsamps <- nrow(data_sets.df)
 all_samples.lmiss <- rbind(all_samples_vs_droSim1.lmiss, all_samples_vs_droSec1.lmiss) %>% select(c(refgenome, N_MISS)) %>%  mutate(refgenome=as.factor(refgenome), N_PRES=nsamps-N_MISS)
 
 ```
-
 
 ```{r echo=FALSE}
 ggplot(all_samples.lmiss) + geom_freqpoly(aes(x=N_PRES, group=refgenome, color=refgenome), bins=nsamps) + scale_x_continuous(name ="Number Samples",limits=c(1,nsamps), breaks =seq(1,nsamps,1)) + theme_clear() + labs(title="Histogram of SNPs by Number of Samples Called At Site", y="Number of Sites")
@@ -347,7 +344,19 @@ ggplot(all_samples.imiss.augmented) + geom_point(aes(x= value, y=1-F_MISS, color
 
 
 
+Once called, the allele frequency of each SNP was compared 
 
+
+
+
+
+## Allele Frequency Shift
+
+Once the SNPs were called, the VCF file was split into four subsets: the wild simulans & sechellia populations, the backcross & selection lines, and pseudocontrol sechellia sequences downloaded from NCBI. For each SNP still meeting minimum requirments (biallelic, at most one missing sample), the group-wide allele frequency was calculated. The frequencies for the sechellia and simulans populations were used as reference points, and the distance to the simulans frequency and the sechellia frequency calculated for each SNP, for the selection-backcross and the pseudocontrol subsets. The per-window average shift was then calculated. 
+
+## Windowed clustering
+
+words
 
 
 # Results

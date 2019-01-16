@@ -356,6 +356,7 @@ rule calc_frq_shift:
 		mkdir -p variant_analysis/freqShift/
 		bedtools intersect -wa -wb -a {input.par1_frq} -b  {input.par2_frq} | bedtools intersect -wa -wb -a - -b  {input.off_frq} | cut -f 1,2,4-6,10,12,16,18 | tr ":" "\t" | awk '{{print $1,$2,$2+1,"0","0","+",$4,$6,$3,$7,$8,$10,$11,$13}}' | tr " " "\t" > {output.frqShft_out}.pre
 		Rscript scripts/freqShifter.R {output.frqShft_out}.pre {output.frqShft_out}
+		rm {output.frqShft_out}.pre
 		"""
 
 #	no need for biallelic check - that's done in the subsetting
@@ -414,7 +415,7 @@ rule pairwise_VCF_distance_metric_windowed:
 		shell(
 			"""
 			mkdir -p variants/{wildcards.prefix}.vs_{wildcards.ref_genome}.{wildcards.aligner}/distances/{wildcards.indiv_1}/
-			bedtools map -a {input.windoze_in} -b <(vcf-subset {input.vcf_in} -u -c {wildcards.indiv_1},{wildcards.indiv_2} | grep -v "#" | sed -e 's/0\/0:\S*\(\s\|$\)/0\t/g'  | sed -e 's/0\/1:\S*\(\s\|$\)/1\t/g' | sed -e 's/1\/0:\S*\(\s\|$\)/1\t/g' | sed -e 's/1\/1:\S*\(\s\|$\)/2\t/g' | sed -e 's/\.:\S*\(\s\|$\)/NA\t/g' |awk '{{print $1,$2,$2+1,0,0,"*",$10,$11,sqrt(($10-$11)^2)}}' | tr " " "\t" | grep -v NA ) -c 9,9 -o sum,count | awk '{{if($6>0)print $1,$2,$3,$4,$5/(2*$6) ;else print $1,$2,$3,$4,"NA"}}' | tr " " "\t" > {output.pairdist_out[0]}
+			bedtools map -a {input.windoze_in} -b <(vcf-subset {input.vcf_in} -u -c {wildcards.indiv_1},{wildcards.indiv_2} | grep -v "#" | sed -e 's/0\/0:\S*\(\s\|$\)/0\t/g'  | sed -e 's/0\/1:\S*\(\s\|$\)/1\t/g' | sed -e 's/1\/0:\S*\(\s\|$\)/1\t/g' | sed -e 's/1\/1:\S*\(\s\|$\)/2\t/g' | sed -e 's/\.:\S*\(\s\|$\)/NA\t/g' |awk '{{print $1,$2,$2+1,0,0,"*",$10,$11,sqrt(($10-$11)^2)}}' | tr " " "\t" | grep -v NA | bedtools sort -i - ) -c 9,9 -o sum,count | awk '{{if($6>0)print $1,$2,$3,$4,$5/(2*$6) ;else print $1,$2,$3,$4,"NA"}}' | tr " " "\t" > {output.pairdist_out[0]}
 			"""
 			)
 		if len(set(output.pairdist_out)) > 1:

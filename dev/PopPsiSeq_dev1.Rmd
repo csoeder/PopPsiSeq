@@ -395,7 +395,7 @@ ggplot(breadth.process %>%  select(-c(breadth_retention, measure)) %>%  gather(b
 ```
 
 do this to include script contents eg in the methods
-```{r  engine='bash', comment='', tidy=TRUE, tidy.opts=list(width.cutoff=60)} 
+```{r  engine='bash', comment='', tidy=TRUE, tidy.opts=list(width.cutoff=60) } 
 cat scripts/bam_summarizer.py
 ```
 
@@ -794,7 +794,7 @@ calculating a windowed distance matrix lends itself to the snakemake recursive w
 hm, worried about the clobbering of distance matricies as written
 
 
-```{r echo=FALSE}
+```{r echo=FALSE, include=FALSE, warning=FALSE}
 #ordinarily this would come from the config file: 
 #	data_sets.df %>% filter(subroups == "all") %>% order_by(experimental/control/popSim)
 
@@ -823,8 +823,8 @@ for (samp in samp_list) {
 	i <- i+1
 	}
 
-	rownames(df.mat.tmp) <- samp_list
-	colnames(df.mat.tmp) <- samp_list
+#	rownames(df.mat.tmp) <- samp_list
+#	colnames(df.mat.tmp) <- samp_list
 	matt_list[[winnum]] <- df.mat.tmp
 }
 
@@ -901,7 +901,7 @@ denny %>% set("labels_col",data_sets.df.tmp$label %>% as.character()) %>%  hang.
 
 
 
-```{r echo=FALSE}
+```{r echo=FALSE, include=FALSE, eval=FALSE}
 
 data_sets.df.tmp <- data_sets.df %>%  filter(subgroups=='all')
 
@@ -936,9 +936,10 @@ for (matt in seq(1,length(matt_list) )) {
 ```{r echo=FALSE}
 #install.packages("gridExtra")
 #install.packages("cowplot")
-library("gridExtra")
-library("cowplot")
 library("grid")
+library("gridExtra")
+
+library("cowplot")
 
 ```
 
@@ -998,6 +999,72 @@ Rscript scripts/freqShifter.R potato tomato
 ```
 
 
+## 9 Jan 2019
+
+ok now gonna plot the frequency shifts and such
+
+
+```{r echo=FALSE}
+windowedFreqShift.control.bg <- import.bedGraph("variant_analysis/freqShift/all_samples.control_with_PopSec_and_PopSim.vs_droSim1.bwaUniq.windowed_w100000_s100000.frqShift", genome="droSim1")
+
+names(mcols(windowedFreqShift.control.bg)) <-  c("score", "sum_sim_introg_deltaF", "sum_sec_depl_deltaF", "num_snp")
+
+windowedFreqShift.control.bg$sum_sim_introg_deltaF <- as.numeric(windowedFreqShift.control.bg$sum_sim_introg_deltaF)
+windowedFreqShift.control.bg$sum_sec_depl_deltaF <- as.numeric(windowedFreqShift.control.bg$sum_sec_depl_deltaF)
+
+windowedFreqShift.control.bg$avg_sim_introg <- windowedFreqShift.control.bg$sum_sim_introg_deltaF/windowedFreqShift.control.bg$num_snp
+windowedFreqShift.control.bg$avg_sec_depl <- windowedFreqShift.control.bg$sum_sec_depl_deltaF/windowedFreqShift.control.bg$num_snp
+windowedFreqShift.control.bg$treatment <- as.factor("control")
+
+windowedFreqShift.selection.bg <- import.bedGraph("variant_analysis/freqShift/all_samples.selection_with_PopSec_and_PopSim.vs_droSim1.bwaUniq.windowed_w100000_s100000.frqShift", genome="droSim1")
+
+names(mcols(windowedFreqShift.selection.bg)) <-  c("score", "sum_sim_introg_deltaF", "sum_sec_depl_deltaF", "num_snp")
+
+
+windowedFreqShift.selection.bg$sum_sim_introg_deltaF <- as.numeric(windowedFreqShift.selection.bg$sum_sim_introg_deltaF)
+windowedFreqShift.selection.bg$sum_sec_depl_deltaF <- as.numeric(windowedFreqShift.selection.bg$sum_sec_depl_deltaF)
+
+
+windowedFreqShift.selection.bg$avg_sim_introg <- windowedFreqShift.selection.bg$sum_sim_introg_deltaF/windowedFreqShift.selection.bg$num_snp
+windowedFreqShift.selection.bg$avg_sec_depl <- windowedFreqShift.selection.bg$sum_sec_depl_deltaF/windowedFreqShift.selection.bg$num_snp
+windowedFreqShift.selection.bg$treatment <- as.factor("selection")
+
+windowedFreqShift.bg <- c(windowedFreqShift.selection.bg, windowedFreqShift.control.bg)
+
+windowedFreqShift.bg.chr2L <- windowedFreqShift.bg[windowedFreqShift.bg@seqnames=='chr2L']
+
+freqCompare.windowed.snpCount.tk <- autoplot(windowedFreqShift.bg.chr2L, aes(y=num_snp, color=treatment), geom='line') + theme_clear()
+freqCompare.windowed.simIntrog.tk <- autoplot(windowedFreqShift.bg.chr2L, aes(y=avg_sim_introg, color=treatment), geom='line') + theme_clear()
+freqCompare.windowed.secDeplet.tk <- autoplot(windowedFreqShift.bg.chr2L, aes(y=avg_sec_depl, color=treatment), geom='line') + theme_clear()
+
+tks <- tracks( number_SNPs = freqCompare.windowed.snpCount.tk, simulans_similarity = freqCompare.windowed.simIntrog.tk, sechellia_dissimilarity = freqCompare.windowed.secDeplet.tk )
+```
+
+
+```{r echo=FALSE}
+tks
+```
+
+
+.....lol
+
+```{r echo=FALSE}
+windowedFreqShift.bg.autosomal <- windowedFreqShift.bg[windowedFreqShift.bg@seqnames %in% c('chr2L','chr2R','chr3L','chr3R')]
+
+autoplot(windowedFreqShift.bg.autosomal, aes(y=avg_sim_introg, color=treatment), geom='line') + facet_wrap(~seqnames) + theme_clear()
+
+autoplot(windowedFreqShift.bg.autosomal, aes(y=avg_sec_depl, color=treatment), geom='line') + facet_wrap(~seqnames) + theme_clear()
+
+```
+
+
+## 10 Jan 2019
+
+working on integrating the freq shifts / clusters into the main report.
+
+## 14 January 2019
+
+Titling a table grob: https://stackoverflow.com/questions/31640916/how-can-i-add-a-title-to-a-tablegrob-plot
 
 
 biocLite("HelloRanges")
