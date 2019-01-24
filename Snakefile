@@ -1,6 +1,8 @@
 configfile: 'config.yaml'
 
 #module load python/3.5.1 samtools freebayes vcftools bwa bedtools r/3.5.0 rstudio/1.1.453
+#PATH=$PATH:/nas/longleaf/home/csoeder/modules/vcflib/bin
+
 
 sample_by_name = {c['name'] : c for c in config['data_sets']}
 ref_genome_by_name = { g['name'] : g for g in config['reference_genomes']}
@@ -41,6 +43,7 @@ rule reference_genome_reporter:
 	params:
 		runmem_gb=1,
 		runtime="5:00",
+		cores=1,
 	shell:
 		"""
 		mkdir -p meta/reference_genomes/
@@ -55,6 +58,7 @@ rule demand_reference_genome_summary:
 	params:
 		runmem_gb=1,
 		runtime="5:00",
+		cores=1,
 	shell:
 		"cat {input.refgen_reports} > {output.refgen_summary}"
 
@@ -69,6 +73,7 @@ rule fastp_clean_sample_se:
 	params:
 		runmem_gb=8,
 		runtime="3:00:00",
+		cores=1,
 		#--trim_front1 and -t, --trim_tail1
 		#--trim_front2 and -T, --trim_tail2. 
 		common_params = "--json {pathprefix}/{samplename}.False.json",# --html meta/FASTP/{samplename}.html", 
@@ -88,6 +93,7 @@ rule fastp_clean_sample_pe:
 	params:
 		runmem_gb=8,
 		runtime="3:00:00",
+		cores=1,
 		#--trim_front1 and -t, --trim_tail1
 		#--trim_front2 and -T, --trim_tail2. 
 		common_params = "--json {pathprefix}/{samplename}.True.json",# --html meta/FASTP/{samplename}.html", 
@@ -107,7 +113,7 @@ rule fastp_clean_sample_pe:
 # 	shell:
 # 		"touch {output.outflg}"
 
-lambda wildcards: return_file_relpath_by_sampname(wildcards)
+#lambda wildcards: return_file_relpath_by_sampname(wildcards)
 
 rule FASTP_summarizer:
 	input: 
@@ -117,6 +123,7 @@ rule FASTP_summarizer:
 	params:
 		runmem_gb=1,
 		runtime="5:00",
+		cores=1,
 	message:
 		"Summarizing reads for sample ({wildcards.samplename}) .... "	
 	shell:
@@ -133,6 +140,7 @@ rule demand_FASTQ_analytics:	#forces a FASTP clean
 	params:
 		runmem_gb=1,
 		runtime="1:00",
+		cores=1,
 	message:
 		"Collecting read summaries for all samples ...."
 	shell:
@@ -149,6 +157,7 @@ rule bwa_align:
 	params:
 		runmem_gb=64,
 		runtime="64:00:00",
+		cores=8,
 	message:
 		"aligning reads from {wildcards.sample} to reference_genome {wildcards.ref_genome} .... "
 	run:
@@ -173,6 +182,7 @@ rule bwa_uniq:
 		uniqueness="XT:A:U.*X0:i:1.*X1:i:0",
 		runmem_gb=16,
 		runtime="6:00:00",
+		cores=4,
 	message:
 		"filtering alignment of {wildcards.sample} to {wildcards.ref_genome} for quality and mapping uniqueness.... "	
 	run:
@@ -192,6 +202,7 @@ rule bam_reporter:
 	params:
 		runmem_gb=8,
 		runtime="4:00:00",
+		cores=1,
 	message:
 		"Collecting metadata for the {wildcards.aligner} alignment of {wildcards.sample} to {wildcards.ref_genome}.... "
 	run:
@@ -214,6 +225,7 @@ rule demand_BAM_analytics:
 	params:
 		runmem_gb=1,
 		runtime="1:00",
+		cores=1,
 	message:
 		"collecting all alignment metadata.... "
 	shell:
@@ -222,24 +234,43 @@ rule demand_BAM_analytics:
 #	echo  $( cat test.samtools.idxstats |  sed \$d | cut -f 2 | paste -sd+ | bc) $(cat test.samtools.idxstats |  sed \$d | cut -f 3 | paste -sd+ | bc) | tr  " " "\t" | awk '{print "total\t"$1/$2}'
 
 
-rule joint_vcf_caller:
+# rule joint_vcf_caller:
+# 	input:
+# 		bams_in = lambda wildcards: expand("mapped_reads/{sample}.vs_{ref_genome}.{aligner}.sort.bam", sample=sample_by_name.keys(), ref_genome=wildcards.ref_genome, aligner=wildcards.aligner),
+# 	output:
+# 		vcf_out = "variants/all_samples.vs_{ref_genome}.{aligner}.vcf"
+# 	params:
+# 		freebayes="--standard-filters",
+# 		runmem_gb=32,
+# 		runtime="96:00:00",
+# 	message:
+# 		"Jointly calling variants from all samples mapped to \ {wildcards.ref_genome} \ with \ {wildcards.aligner} \ "
+# 	run:
+# 		ref_genome_file=ref_genome_by_name[wildcards.ref_genome]['path']
+# 		shell("freebayes {params.freebayes} -f {ref_genome_file} {input.bams_in} | vcftools --remove-indels --vcf - --recode --recode-INFO-all --stdout  > {output.vcf_out}")
+
+
+## VCF summary report? eg, shared fraction of genome covered by x% of samples at mindepth?
+
+
+rule joint_vcf_caller_parallel:
 	input:
 		bams_in = lambda wildcards: expand("mapped_reads/{sample}.vs_{ref_genome}.{aligner}.sort.bam", sample=sample_by_name.keys(), ref_genome=wildcards.ref_genome, aligner=wildcards.aligner),
+		windows_in = "utils/{ref_genome}_w100000_s100000.windows.bed"
 	output:
 		vcf_out = "variants/all_samples.vs_{ref_genome}.{aligner}.vcf"
 	params:
 		freebayes="--standard-filters",
 		runmem_gb=32,
 		runtime="96:00:00",
+		cores=24,
 	message:
 		"Jointly calling variants from all samples mapped to \ {wildcards.ref_genome} \ with \ {wildcards.aligner} \ "
 	run:
 		ref_genome_file=ref_genome_by_name[wildcards.ref_genome]['path']
-		shell("freebayes {params.freebayes} -f {ref_genome_file} {input.bams_in} | vcftools --remove-indels --vcf - --recode --recode-INFO-all --stdout  > {output.vcf_out}")
-
-
-## VCF summary report? eg, shared fraction of genome covered by x% of samples at mindepth?
-
+		shell("cat {input.windows_in}| awk '{{print$1":"$2"-"$3}}' > {input.windows_in}.rfmt")
+		shell("~/modules/freebayes/scripts/freebayes-parallel {input.windows_in}.rfmt {params.cores}  --standard-filters -f {ref_genome_file} {input.bams_in} | vcftools --remove-indels --vcf - --recode --recode-INFO-all --stdout  > {output.vcf_out} ")
+		#shell("freebayes {params.freebayes} -f {ref_genome_file} {input.bams_in} | vcftools --remove-indels --vcf - --recode --recode-INFO-all --stdout  > {output.vcf_out}")
 
 
 rule vcf_reporter:
@@ -251,6 +282,7 @@ rule vcf_reporter:
 	params:
 		runmem_gb=8,
 		runtime="4:00:00",
+		cores=4,
 #	message:
 #		"Collecting metadata for the {wildcards.aligner} alignment of {wildcards.sample} to {wildcards.ref_genome}.... "
 	shell:
@@ -280,6 +312,7 @@ rule summon_VCF_analytics_base:
 	params:
 		runmem_gb=1,
 		runtime="1:00",
+		cores=1,
 	message:
 		"collecting all alignment metadata.... "
 	shell:
@@ -300,6 +333,7 @@ rule subset_VCF_to_subgroup:
 	params:
 		runmem_gb=8,
 		runtime = "1:00:00",
+		cores=2,
 	message:
 		"Subsetting the variant file \ {input.vcf_in} \ to the individuals in the subgroup \ {wildcards.subgroup} \ .... "
 	run:
@@ -314,6 +348,7 @@ rule window_maker:
 	params:
 		runmem_gb=8,
 		runtime="5:00"
+		cores=1,
 	run:
 		fai_path = ref_genome_by_name[wildcards.ref_genome]['fai'],
 		shell("mkdir -p utils")
@@ -334,6 +369,7 @@ rule clean_groupFreqs:
 	params:
 		runmem_gb=16,
 		runtime="15:00"
+		cores=2,
 	shell:
 		"""
 		mkdir -p variant_analysis/freqs/
@@ -351,6 +387,7 @@ rule calc_frq_shift:
 	params:
 		runmem_gb=16,
 		runtime="1:00:00"
+		cores=2,
 	shell:
 		"""
 		mkdir -p variant_analysis/freqShift/
@@ -371,6 +408,7 @@ rule window_frq_shift:
 	params:
 		runmem_gb=16,
 		runtime="1:00:00"
+		cores=4,
 	shell:
 		"""
 		bedtools map -c 7,8,8 -o sum,sum,count -null NA -a {input.windows_in} -b <( tail -n +2  {input.frqShft_in} | cut -f  1-3,15,16 | nl | tr -d " " | awk '{{print $2,$3,$4,$1,"0",".",$5,$6}}' | tr " " "\t"| bedtools sort -i - ) > {output.windowed_out}
@@ -411,6 +449,7 @@ rule pairwise_VCF_distance_metric_windowed:
 	params:
 		runmem_gb=16,
 		runtime = "1:00:00",
+		cores=2,
 	run:
 		shell(
 			"""
@@ -436,6 +475,7 @@ rule all_dist_to_indiv_by_group:
 	params:
 		runmem_gb=8,
 		runtime = "10:00",
+		cores=2,
 	run:
 		shell("touch {output.group_dist}.tmp")
 
@@ -454,6 +494,7 @@ rule group2group_VCF_distance:
 	params:
 		runmem_gb=1,
 		runtime = "1:00",
+		cores=1,
 	shell:
 		"""echo {input.tables_in} | tr " " "\n" > {output.roster_out}"""
 
@@ -472,6 +513,7 @@ rule write_report:
 	params:
 		runmem_gb=8,
 		runtime="1:00:00",
+		cores=2,
 	message:
 		"writing up the results.... "
 	run:

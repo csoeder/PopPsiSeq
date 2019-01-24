@@ -1067,6 +1067,33 @@ working on integrating the freq shifts / clusters into the main report.
 Titling a table grob: https://stackoverflow.com/questions/31640916/how-can-i-add-a-title-to-a-tablegrob-plot
 
 
+## 22 January 2019
+
+Gotta speed up the variant calling
+https://groups.google.com/forum/#!topic/freebayes/AGBvsqZIxE4
+
+## 23 January 2019
+
+had to edit the freebayes-parallel script to take explicit file names for the vcflib commands, and also download the GNU Parallel package and add its location to my $PATH:
+/nas/longleaf/home/csoeder/modules/parallel/bin/
+
+sbatch -n 8 -t 1:00:00 --mem=16G --wrap=" ~/modules/freebayes/scripts/freebayes-parallel <(~/modules/freebayes/scripts/fasta_generate_regions.py /proj/cdjones_lab/Genomics_Data_Commons/genomes/drosophila_simulans/droSim1.fa 100000) 8 --standard-filters -f /proj/cdjones_lab/Genomics_Data_Commons/genomes/drosophila_simulans/droSim1.fa mapped_reads/MD06m11d04y2010.vs_droSim1.bwaUniq.sort.bam "
+
+
+## 24 January 2019
+
+SLURM won't cooperate with that subprocess :( 
+
+~/modules/freebayes/scripts/fasta_generate_regions.py /proj/cdjones_lab/Genomics_Data_Commons/genomes/drosophila_simulans/droSim1.fa 100000 > test.test 
+
+sbatch -n 1  -t 1:00:00 --mem=16G --wrap="~/modules/freebayes/scripts/freebayes-parallel test.test 1 --standard-filters -f /proj/cdjones_lab/Genomics_Data_Commons/genomes/drosophila_simulans/droSim1.fa mapped_reads/MD06m11d04y2010.vs_droSim1.bwaUniq.sort.bam > potato.vcf "
+
+ugh gotta rewrite the fasta_generate_regions.py to be python3 compatible though???
+
+nah ditch it entirely and reformat the windowed file. 
+
+
+
 biocLite("HelloRanges")
 
 

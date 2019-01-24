@@ -18,9 +18,20 @@ knitr::opts_knit$set(root.dir='/Users/csoeder/Research/PSIseq/PopPsiSeq/')
 #knitr::opts_knit$set(root.dir='/proj/cdjones_lab/csoeder/PopPsiSeq/')
 #knitr::opts_knit$set(root.dir=peaDubDee)
 library("tidyverse")
+#require(devtools)
+#install_version("ggplot2", version = "3.1.0", repos = "http://cran.us.r-project.org")
 library("knitr")
 library("yaml")
 library("ggbio")
+library("readr")
+library("reshape2")
+library("ggdendro")
+library("dendextend")
+library("grid")
+library("gridExtra")
+library("gtable")
+library("rtracklayer")
+
 #library("sitools")
 
 # gotta set the working directory.....
@@ -76,8 +87,10 @@ The droSim1 and droSec1 reference genomes were downloaded in FASTA format from U
 ```{r echo=FALSE}
 
 
-reference_genomes_summaryStats %>% mutate( value=human_readable_croncher(value)) %>% spread(refGenome, value) %>% rename('Reference Genome:'=measure) %>% kable(caption="Size and Consolidation of Reference Genomes")
+reference_genomes_summaryStats %>% mutate( value=human_readable_croncher(value)) %>% spread(refGenome, value) %>% rename(measure='Reference Genome:')  %>% kable(caption="Size and Consolidation of Reference Genomes")
 
+
+#reference_genomes_summaryStats %>% mutate( value=human_readable_croncher(value)) %>% spread(refGenome, value) %>% rename('Reference Genome:'=measure)  %>% kable(caption="Size and Consolidation of Reference Genomes")
 ```
 
 (add a by-chromosome breakdown for droSim and a histogram for droSec?)
@@ -98,14 +111,14 @@ data_sets.df$source<- as.factor(data_sets.df$source)
 A backcross and introgression experiment was performed, in which simulans females were mated with sechellia males, and the hybrid offspring were selected for avoidance of morinda odorants. The offspring were sequenced after 15 rounds of backcrossing and introgression [@Earley2011]. One sample was sequenced in this experiment; a follow-up experiment generated three more samples with two replicates each. As a control, several wild-type sechellia sequences were downloaded from NCBI:
 
 ```{r echo=FALSE}
-data_sets.df %>%  filter( !is.na(experimental)) %>%  select(c(name, paired, experimental, source)) %>%  arrange(experimental, desc(name)) %>% kable(caption="Sequenced Experimental Samples")
+data_sets.df %>%  filter( !is.na(experimental)) %>% filter(subgroups=='all') %>%  select(c(name, paired, experimental, source)) %>%  arrange(experimental, desc(name)) %>% kable(caption="Sequenced Experimental Samples")
 ```
 
 
 For population-wide data, wild D. simulans and D. sechellia flies were captured and sequenced by Daniel Matute:
 
 ```{r echo=FALSE, results='asis'}
-data_sets.df %>%  filter( !is.na(species)) %>% group_by(species) %>% summarise(sample_count=n()) %>% kable(caption="Number of Sequenced Samples per Species")
+data_sets.df %>%  filter( !is.na(species)) %>% filter(subgroups=='all') %>% group_by(species) %>% summarise(sample_count=n()) %>% kable(caption="Number of Sequenced Samples per Species")
 ```
 
 ### Pre-processing
@@ -230,7 +243,7 @@ Depth of coverage, ie, the genome-wide average number of mapped reads per base p
 
 ```{r echo=FALSE}
 
-depth.process <- all_alignments %>%  filter(measure=='avg_depth' ) %>% spread(aligner, value) %>%  mutate(depth_retention = 100*bwaUniq/bwa) %>% rename( before=bwa, after=bwaUniq)
+depth.process <- all_alignments  %>%  filter(measure=='avg_depth' )%>% spread(aligner, value) %>%  mutate(depth_retention = 100*bwaUniq/bwa) %>% rename( bwa = "before", bwaUniq = "after")
 
 covstats.dpth <- depth.process %>% summarise(step="pre-filtration depth",minimum = min(before), average=mean(before), median = median(before), maximum = max(before))
 
@@ -250,7 +263,7 @@ ggplot(depth.process %>%  select(-c(depth_retention,measure)) %>%  gather(before
 Breadth of coverage, ie, the percentage of the genome covered by at least one read:
 
 ```{r echo=FALSE, include=FALSE}
-breadth.process <- all_alignments %>%  filter(measure=='total_breadth' ) %>% spread(aligner, value) %>%  mutate(breadth_retention = 100*bwaUniq/bwa) %>% rename(before=bwa, after=bwaUniq)
+breadth.process <- all_alignments %>%  filter(measure=='total_breadth' ) %>% spread(aligner, value) %>%  mutate(breadth_retention = 100*bwaUniq/bwa) %>% rename(bwa = "before", bwaUniq="after")
 
 covstats.brdth <- breadth.process %>% summarise(step="pre-filtration breadth",minimum = 100*min(before), average=100*mean(before), median = 100*median(before), maximum = 100*max(before))
 
@@ -287,7 +300,7 @@ all_samples.calledVariants.snpCount <- inner_join(all_samples.calledVariants.sum
 ```
 
 ```{r echo=FALSE}
-all_samples.calledVariants.snpCount %>%  mutate(snp_rate=1000*total_snp_count/number_bases, total_snp_count=human_readable_croncher(total_snp_count), number_bases=human_readable_croncher(number_bases) ) %>% select(-c(group)) %>% select(c(refGenome, number_bases, total_snp_count, snp_rate)) %>% rename(`reference genome` = refGenome,`Genome size (bp)`=number_bases, `total SNP count`=total_snp_count, `SNPs per kB`=snp_rate) %>% kable(caption="SNP count and per-KB SNP rate across all samples", digits=1)
+all_samples.calledVariants.snpCount %>%  mutate(snp_rate=1000*total_snp_count/number_bases, total_snp_count=human_readable_croncher(total_snp_count), number_bases=human_readable_croncher(number_bases) ) %>% select(-c(group))  %>% select(c(refGenome, number_bases, total_snp_count, snp_rate))  %>% rename( refGenome="reference genome", number_bases="Genome size (bp)", total_snp_count="total SNP count", snp_rate="SNPs per kB"  ) %>% kable(caption="SNP count and per-KB SNP rate across all samples", digits=1)
 
 ```
 
@@ -331,8 +344,10 @@ all_samples.imiss  <- rbind(all_samples_vs_droSec1.imiss, all_samples_vs_droSim1
 
 ```{r echo=FALSE}
 
-all_samples.imiss.augmented <- inner_join(all_samples.imiss, breadth.process %>%  select(c(sample,reference,after)) %>% rename(breadth=after)%>% mutate(breadth = 100*breadth), by=c("name"="sample", "refgenome"="reference"))
-all_samples.imiss.augmented <-inner_join(all_samples.imiss.augmented, depth.process %>%  select(c(sample,reference,after)) %>% rename(depth=after), by=c("name"="sample", "refgenome"="reference"))
+all_samples.imiss.augmented <- inner_join(all_samples.imiss, breadth.process %>%  select(c(sample,reference,after)) %>% rename(after="breadth")%>% mutate(breadth = 100*breadth), by=c("name"="sample", "refgenome"="reference"))
+
+
+all_samples.imiss.augmented <-inner_join(all_samples.imiss.augmented, depth.process %>%  select(c(sample,reference,after)) %>% rename(after="depth"), by=c("name"="sample", "refgenome"="reference"))
 
 all_samples.imiss.augmented <- all_samples.imiss.augmented %>%  gather(breadth:depth, key="measure", value="value")
 
@@ -344,22 +359,241 @@ ggplot(all_samples.imiss.augmented) + geom_point(aes(x= value, y=1-F_MISS, color
 
 
 
-Once called, the allele frequency of each SNP was compared 
-
-
-
-
-
 ## Allele Frequency Shift
 
 Once the SNPs were called, the VCF file was split into four subsets: the wild simulans & sechellia populations, the backcross & selection lines, and pseudocontrol sechellia sequences downloaded from NCBI. For each SNP still meeting minimum requirments (biallelic, at most one missing sample), the group-wide allele frequency was calculated. The frequencies for the sechellia and simulans populations were used as reference points, and the distance to the simulans frequency and the sechellia frequency calculated for each SNP, for the selection-backcross and the pseudocontrol subsets. The per-window average shift was then calculated. 
 
+Here is a hypothetical example: suppose that at a given site in the genome, 75% of alleles in the sechellia population are T and 25% are A. Suppose in the simulans population, it's 25% T and 75% A. Now, the allele frequency is tallied in three different subgroups:
+In the first subgroup, 100% of alleles are T. This subgroup would have a sech-ward shift of +0.25 and a sim-ward shift of -0.75. 
+In the second subgroup, 50% of alleles are T. This subgroup would have a sech-ward shift of -0.25 and a sim-ward shift of -0.25. 
+In the third subgroup, 0% of alleles are T and all are A. This subgroup would have a sech-ward shift of -0.75 and a sim-ward shift of +0.25.  
+
+
+
+
+
 ## Windowed clustering
 
-words
+A distance measure on a genomic interval between two samples was defined: among sites in that interval which had a genotype called in both samples, the difference in alleles was summed and divided by SNP count to give an averaged difference. This metric was calculated for each 100kB window in the droSim1 reference genome, for each pair of samples. 
 
 
 # Results
+
+## Basic Results Summary
+
+## Allele Frequency Shift
+
+Population-wide allele frequencies were calculated for the wild-caught sechellia and simulans samples; these were taken as species-representative values. The allele frequencies in the selection and pseudocontrol groups were compared to the wild species frequencies, and the difference between treatment AF and species AF was calculated, then summed and averaged by 100kB window. 
+
+
+```{r echo=FALSE}
+windowedFreqShift.control.bg <- import.bedGraph("variant_analysis/freqShift/all_samples.control_with_PopSec_and_PopSim.vs_droSim1.bwaUniq.windowed_w100000_s100000.frqShift", genome="droSim1")
+
+names(mcols(windowedFreqShift.control.bg)) <-  c("score", "sum_sim_introg_deltaF", "sum_sec_depl_deltaF", "num_snp")
+
+windowedFreqShift.control.bg$sum_sim_introg_deltaF <- as.numeric(windowedFreqShift.control.bg$sum_sim_introg_deltaF)
+windowedFreqShift.control.bg$sum_sec_depl_deltaF <- as.numeric(windowedFreqShift.control.bg$sum_sec_depl_deltaF)
+
+windowedFreqShift.control.bg$avg_sim_introg <- windowedFreqShift.control.bg$sum_sim_introg_deltaF/windowedFreqShift.control.bg$num_snp
+windowedFreqShift.control.bg$avg_sec_depl <- windowedFreqShift.control.bg$sum_sec_depl_deltaF/windowedFreqShift.control.bg$num_snp
+windowedFreqShift.control.bg$treatment <- as.factor("control")
+windowedFreqShift.control.bg$win <-  seq(1,nrow(mcols(windowedFreqShift.control.bg)))
+
+
+
+windowedFreqShift.selection.bg <- import.bedGraph("variant_analysis/freqShift/all_samples.selection_with_PopSec_and_PopSim.vs_droSim1.bwaUniq.windowed_w100000_s100000.frqShift", genome="droSim1")
+
+names(mcols(windowedFreqShift.selection.bg)) <-  c("score", "sum_sim_introg_deltaF", "sum_sec_depl_deltaF", "num_snp")
+
+
+windowedFreqShift.selection.bg$sum_sim_introg_deltaF <- as.numeric(windowedFreqShift.selection.bg$sum_sim_introg_deltaF)
+windowedFreqShift.selection.bg$sum_sec_depl_deltaF <- as.numeric(windowedFreqShift.selection.bg$sum_sec_depl_deltaF)
+
+
+windowedFreqShift.selection.bg$avg_sim_introg <- windowedFreqShift.selection.bg$sum_sim_introg_deltaF/windowedFreqShift.selection.bg$num_snp
+windowedFreqShift.selection.bg$avg_sec_depl <- windowedFreqShift.selection.bg$sum_sec_depl_deltaF/windowedFreqShift.selection.bg$num_snp
+windowedFreqShift.selection.bg$treatment <- as.factor("selection")
+windowedFreqShift.selection.bg$win <-  seq(1,nrow(windowedFreqShift.selection.bg %>%  mcols()))
+
+
+
+
+windowedFreqShift.bg <- c(windowedFreqShift.selection.bg, windowedFreqShift.control.bg)
+```
+```{r echo=FALSE}
+windowedFreqShift.bg.autosomal <- windowedFreqShift.bg[windowedFreqShift.bg@seqnames %in% c('chr2L','chr2R','chr3L','chr3R')]
+
+autoplot(windowedFreqShift.bg.autosomal, aes(y=avg_sim_introg, color=treatment), geom='line') + facet_wrap(~seqnames, scales = "free_x") + labs(y="Simulans-direction AF Shift", title = "Shift in Allele Frequency\nTowards Simulans Allele (autosomes)") + theme_clear() + theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+
+autoplot(windowedFreqShift.bg.autosomal, aes(y=avg_sec_depl, color=treatment), geom='line') + facet_wrap(~seqnames, scales = "free_x") + labs(y="Sechellia-opposing AF Shift", title = "Shift in Allele Frequency\nAway from Sechellia Allele (autosomes)") + theme_clear() + theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+```
+```{r echo=FALSE}
+
+windowedFreqShift.bg.chr2L <- windowedFreqShift.bg[windowedFreqShift.bg@seqnames=='chr2L']
+
+freqCompare.windowed.snpCount.tk <- autoplot(windowedFreqShift.bg.chr2L, aes(y=num_snp, color=treatment), geom='line') + theme_clear() + labs(y='')
+freqCompare.windowed.simIntrog.tk <- autoplot(windowedFreqShift.bg.chr2L, aes(y=avg_sim_introg, color=treatment), geom='line') + theme_clear() + labs(y='') + guides(color=FALSE)
+freqCompare.windowed.secDeplet.tk <- autoplot(windowedFreqShift.bg.chr2L, aes(y=avg_sec_depl, color=treatment), geom='line') + theme_clear() + labs(y='') + guides(color=FALSE)
+
+tks.chr2L <- tracks( "SNPs per Window" = freqCompare.windowed.snpCount.tk, "Simulans Similarity" = freqCompare.windowed.simIntrog.tk, "Sechellia Dissimiliarity" = freqCompare.windowed.secDeplet.tk, title = "Comparison of Treatment Flies to Natural Populations\n(chr2L closeup)")
+
+tks.chr2L
+```
+
+Overall, it's actually the pseudocontrol sechellia lines downloaded from NCBI which show large islands of simulans-character (as defined by the variants called in the matute population sequences). In some cases, the backcross/selection samples show similar trends in the same regions; in other places, the pseudocontrols show clear simulans-character while the backcross/selection lines have a much more muted response. Only a region ~25+MB on chr3R shows simulans-character elevated above that of the pseudocontrols.
+
+
+## Windowed Clustering
+
+To better understand these patterns, a sample-to-sample distance was calculated, for each pair of samples, for each 100kB window in the reference genome, by tallying the number of shared alleles at in-window variable sites. This distance function was used to construct heatmaps and dendrograms to visualize patterns of similarity and difference.  
+
+```{r echo=FALSE, include=FALSE}
+samp_list <- levels(data_sets.df$name)
+
+df_list <- vector("list", length(samp_list))
+i <- 1
+
+for (samp in samp_list) {
+	df.tmp <- read_delim(paste("variants/all_samples.vs_droSim1.bwaUniq/distances/", samp, "/all.droSim1_w100000_s100000.tbl", sep=""), "\t", escape_double = FALSE, trim_ws = TRUE) 
+	df.tmp$win <- seq(1,nrow(df.tmp))
+	df_list[[i]] <- df.tmp
+	i <- i+1
+}
+
+
+
+window_lookup <- df_list[[1]] %>% select(c("chr","start","stop","win"))
+
+
+matt_list <- vector("list", max(df_list[[1]]$win))
+for (winnum in df_list[[1]]$win){
+
+	df.mat.tmp <- matrix(0, nrow=length(samp_list), ncol= length(samp_list))
+
+	 i <- 1
+
+	for (samp in samp_list) {
+
+		df.mat.tmp[i,] <- df_list[[i]] %>% filter(win == winnum) %>% select(samp_list) %>% as.matrix()
+		i <- i+1
+			
+	}
+		 
+	rownames(df.mat.tmp) <- samp_list
+	colnames(df.mat.tmp) <- samp_list
+	matt_list[[winnum]] <- df.mat.tmp
+	 
+}
+
+```
+
+```{r echo=FALSE}
+
+draw_heatmap <- function(d.matt){
+	melted_matt <- melt(d.matt)
+	melted_matt.plt <- ggplot(data = melted_matt, aes(x=Var1, y=Var2, fill=1-value)) + geom_tile()+ scale_fill_gradient(limits=c(0.4,1)) + theme(legend.position = "none") +labs(x="", y="")
+	return(melted_matt.plt)
+}
+
+draw_tree <- function(d.matt){
+	denny <- hclust(d.matt %>%  as.dist()) %>% as.dendrogram() 
+	leafList<-denny %>% get_leaves_attr("label")
+
+	data_sets.df.tmp <- data_sets.df %>%  filter(subgroups=='all')
+	data_sets.df.tmp <- data_sets.df.tmp[match(leafList, data_sets.df.tmp$name),]
+
+	data_sets.df.tmp$label <- data_sets.df.tmp$experimental %>% as.character()
+	data_sets.df.tmp$label[is.na(data_sets.df.tmp$label)] <-  data_sets.df.tmp$species[is.na(data_sets.df.tmp$label)] %>% as.character()
+	data_sets.df.tmp$label <- as.factor(data_sets.df.tmp$label)
+	levels(data_sets.df.tmp$label) <- list(`dark cyan`="selection", magenta="control", orange="drosophila sechellia", black="drosophila simulans")
+
+	denny.plt <- denny %>% set("labels_col",data_sets.df.tmp$label %>% as.character()) %>%  hang.dendrogram(hang_height = .25) %>% set("leaves_col", data_sets.df.tmp$label %>% as.character()) %>%  set("leaves_pch", 19) %>% set("leaves_cex", 2)  %>% as.ggdend() %>% ggplot() + ylim(c(-2,2))
+
+	return(denny.plt)
+
+}
+
+draw_contig <- function(d.matt, win.lookup){
+	
+	windowedFreqShift.bg.contig <- windowedFreqShift.bg[windowedFreqShift.bg@seqnames==win.lookup$chr]
+	
+
+		windowedFreqShift.simIntrog.tk <- autoplot(windowedFreqShift.bg.contig, aes(y=avg_sim_introg, color=treatment), geom='line') + geom_vline(aes(xintercept=midpoint, alpha=as.factor(win==win.lookup$win)), color="purple") + scale_alpha_discrete(range=c(0,1))+ theme_clear()+ theme(legend.position="none") + labs(y="Sim-wards Shift")
+		
+		return(windowedFreqShift.simIntrog.tk)
+
+}
+
+draw_main <- function(heatmap, tree, contig){
+		grud <-grid.arrange(contig@ggplot, heatmap, tree, nrow = 2, layout_matrix = cbind(c(1,2), c(1,3)))
+	return(grud)
+
+}
+
+draw_main.by_winnum <- function(winnum){
+	window <- window_lookup %>% filter(win == winnum)
+	ht.plt <- draw_heatmap(matt_list[[winnum]])
+	tr.plt <- draw_tree(matt_list[[winnum]])
+	contig.plt <- draw_contig(matt_list[[winnum]], window)
+	main.plt <- draw_main(ht.plt, tr.plt, contig.plt)
+	
+	
+	#main.title <- textGrob(paste(window$chr,":", human_readable_croncher(window$start), "-", human_readable_croncher(window$stop)),gp=gpar(fontsize=18))
+	#padding <- unit(5,"mm")
+
+
+	#main.plt <- gtable_add_rows( main.plt, heights = grobHeight(main.title) + padding, pos = 0)
+	
+
+	#main.plt <- gtable_add_grob( main.plt, main.title, 1, 1, 1, ncol(main.plt))
+		
+	#grid.newpage()
+	#grid.draw(main.plt)
+
+	
+	return(main.plt)		
+	}
+
+
+#### NOTE! this is all premised on the windowd numbers match up between the FrqShift bedgraph and the matricies....
+```
+
+A typical baseline window is as expected: the population sechellia, backcross/selected lines, and pseudocontrols all show high similarity with one another and cluster in the dendrogram; the population simulans clusters in contrast:
+
+```{r echo=FALSE}
+draw_main.by_winnum(100)
+```
+
+
+
+In some places, both the pseudocontrols and the selection/backcross lines show similar enhancement of simulans-character, and the patterns are more complicated: some selection lines (the 10's) retain sechellia-character, with 10A especially clustering with the wild-caught sechellia. The other selection lines cluster with simulans, confirming their similarity. The pseudocontrols are also inconsistent: one (SRR5860570) stays clustered with the sechellia population, while the other two show greater similarity to simulans:
+
+```{r echo=FALSE}
+draw_main.by_winnum(122)
+```
+
+In some places, the pseudocontrols actually show simulans-character which is elevated above that of the backcross/selection hybrids; again, it is SRR5860570 which is clustered with the sechellia population and the hybrids, while the other pseudocontrols cluster with the simulans population:
+
+```{r echo=FALSE}
+draw_main.by_winnum(140)
+```
+
+
+Only one autosomal region appeared to have simulans-nature in backcross/selection hybrids elevated above that in pseudocontrols, in the telomeric end of chr3R. This appears to be driven mostly by samples 17A and 17B.  
+```{r echo=FALSE}
+draw_main.by_winnum(980)
+```
+
+
+
+
+# Discussion
+
+SRR5860570 is the only pseudocontrol which appears to be consistently sechellia-like, judging by its comparison to the wild-caught sechellia population. The others tend to show islands of simulans-nature, including some which don't show up in the backcross/selection lines. 
+
+SRR5860570 was wildcaught in 2012 by Dave Turisini. The other pseudocontrols are laboratory strains. 
 
 # References
 ##Software
