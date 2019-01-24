@@ -1,7 +1,7 @@
 configfile: 'config.yaml'
 
 #module load python/3.5.1 samtools freebayes vcftools bwa bedtools r/3.5.0 rstudio/1.1.453
-#PATH=$PATH:/nas/longleaf/home/csoeder/modules/vcflib/bin
+#PATH=$PATH:/nas/longleaf/home/csoeder/modules/vcflib/bin:/nas/longleaf/home/csoeder/modules/parallel/bin
 
 
 sample_by_name = {c['name'] : c for c in config['data_sets']}
@@ -268,8 +268,9 @@ rule joint_vcf_caller_parallel:
 		"Jointly calling variants from all samples mapped to \ {wildcards.ref_genome} \ with \ {wildcards.aligner} \ "
 	run:
 		ref_genome_file=ref_genome_by_name[wildcards.ref_genome]['path']
-		shell("cat {input.windows_in}| awk '{{print$1":"$2"-"$3}}' > {input.windows_in}.rfmt")
-		shell("~/modules/freebayes/scripts/freebayes-parallel {input.windows_in}.rfmt {params.cores}  --standard-filters -f {ref_genome_file} {input.bams_in} | vcftools --remove-indels --vcf - --recode --recode-INFO-all --stdout  > {output.vcf_out} ")
+		shell("""cat {input.windows_in}| awk '{{print$1":"$2"-"$3}}' > {input.windows_in}.rfmt""")
+		shell("scripts/freebayes-parallel {input.windows_in}.rfmt {params.cores} {params.freebayes} -f {ref_genome_file} {input.bams_in} | vcftools --remove-indels --vcf - --recode --recode-INFO-all --stdout  > {output.vcf_out} ")
+		#shell("~/modules/freebayes/scripts/freebayes-parallel {input.windows_in}.rfmt {params.cores}  --standard-filters -f {ref_genome_file} {input.bams_in} | vcftools --remove-indels --vcf - --recode --recode-INFO-all --stdout  > {output.vcf_out} ")
 		#shell("freebayes {params.freebayes} -f {ref_genome_file} {input.bams_in} | vcftools --remove-indels --vcf - --recode --recode-INFO-all --stdout  > {output.vcf_out}")
 
 
@@ -347,7 +348,7 @@ rule window_maker:
 		windowed='utils/{ref_genome}_w{window_size}_s{slide_rate}.windows.bed'
 	params:
 		runmem_gb=8,
-		runtime="5:00"
+		runtime="5:00",
 		cores=1,
 	run:
 		fai_path = ref_genome_by_name[wildcards.ref_genome]['fai'],
@@ -368,7 +369,7 @@ rule clean_groupFreqs:
 		frq_out = "variant_analysis/freqs/{prefix}.subset_{grup}.vs_{ref_genome}.{aligner}.frq",
 	params:
 		runmem_gb=16,
-		runtime="15:00"
+		runtime="15:00",
 		cores=2,
 	shell:
 		"""
@@ -386,7 +387,7 @@ rule calc_frq_shift:
 		frqShft_out = "variant_analysis/freqShift/{prefix}.{grup_off}_with_{grup_par1}_and_{grup_par2}.vs_{ref_genome}.{aligner}.frqShift"
 	params:
 		runmem_gb=16,
-		runtime="1:00:00"
+		runtime="1:00:00",
 		cores=2,
 	shell:
 		"""
@@ -407,7 +408,7 @@ rule window_frq_shift:
 		windowed_out = "variant_analysis/freqShift/{frqshft_prefix}.vs_{ref_genome}.{aligner}.windowed_w{window_size}_s{slide_rate}.frqShift"
 	params:
 		runmem_gb=16,
-		runtime="1:00:00"
+		runtime="1:00:00",
 		cores=4,
 	shell:
 		"""

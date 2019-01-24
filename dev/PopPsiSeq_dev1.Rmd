@@ -1093,6 +1093,9 @@ ugh gotta rewrite the fasta_generate_regions.py to be python3 compatible though?
 nah ditch it entirely and reformat the windowed file. 
 
 
+Oh great I gotta rewrite the vcflib scripts for python3 too
+
+
 
 biocLite("HelloRanges")
 
