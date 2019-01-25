@@ -1095,6 +1095,9 @@ nah ditch it entirely and reformat the windowed file.
 
 Oh great I gotta rewrite the vcflib scripts for python3 too
 
+## 25 January 2019
+
+ok yeah the parallel processing is a game changer!!! too bad I keep forgetting to change the setwd() command before pushing to git !!!!!!!!!!!!!!!!!!
 
 
 biocLite("HelloRanges")

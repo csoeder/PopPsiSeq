@@ -502,6 +502,8 @@ rule group2group_VCF_distance:
 ############################################################
 
 
+
+
 rule write_report:
 	input:
 		reference_genome_summary = ["meta/reference_genomes.summary"],
@@ -509,6 +511,7 @@ rule write_report:
 		alignment_summaries = expand("meta/alignments.vs_{ref_genome}.{aligner}.summary", ref_genome=['droSim1', 'droSec1'], aligner=['bwa','bwaUniq']),
 		full_variant_summary = expand("meta/{prefix}.calledVariants.{aligner}.summary", aligner=["bwaUniq"], prefix=["all_samples"] ),
 		windowed_frq_shifts = expand("variant_analysis/freqShift/all_samples.{treat}_with_PopSec_and_PopSim.vs_droSim1.bwaUniq.windowed_w100000_s100000.frqShift", treat = ['selection','control']),
+		distances = expand("variants/all_samples.vs_{ref_genome}.bwaUniq/distances/from.all.to.all.{ref_genome}_w100000_s100000.distanceRoster",ref_genome=['droSim1', 'droSec1']),
 	output:
 		pdf_out="thingy.pdf"
 	params:
