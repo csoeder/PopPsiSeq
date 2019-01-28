@@ -14,9 +14,9 @@ bibliography: references.bib
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 #knitr::opts_chunk$set(root.dir = '/Users/csoeder/Research/PSIseq/PopPsiSeq/')
-#knitr::opts_knit$set(root.dir='/Users/csoeder/Research/PSIseq/PopPsiSeq/')
+knitr::opts_knit$set(root.dir='/Users/csoeder/Research/PSIseq/PopPsiSeq/')
 #knitr::opts_knit$set(root.dir='/proj/cdjones_lab/csoeder/PopPsiSeq/')
-knitr::opts_knit$set(root.dir=peaDubDee)
+#knitr::opts_knit$set(root.dir=peaDubDee)
 library("tidyverse")
 #require(devtools)
 #install_version("ggplot2", version = "3.1.0", repos = "http://cran.us.r-project.org")
@@ -594,6 +594,9 @@ draw_main.by_winnum(980)
 SRR5860570 is the only pseudocontrol which appears to be consistently sechellia-like, judging by its comparison to the wild-caught sechellia population. The others tend to show islands of simulans-nature, including some which don't show up in the backcross/selection lines. 
 
 SRR5860570 was wildcaught in 2012 by Dave Turisini. The other pseudocontrols are laboratory strains. 
+
+
+
 
 # References
 ##Software

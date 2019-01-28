@@ -1099,6 +1099,23 @@ Oh great I gotta rewrite the vcflib scripts for python3 too
 
 ok yeah the parallel processing is a game changer!!! too bad I keep forgetting to change the setwd() command before pushing to git !!!!!!!!!!!!!!!!!!
 
+From: Soeder, Charles
+Sent: Monday, January 21, 2019 12:47 AM
+To: Earley, Eric; Jones, Corbin D
+Subject: Re: another test of selection
+
+1) how to exclude incomplete lineage sorting?
+2) timing of introgression from sim: before or after domestication?
+a) in the first case, the variation would appear in the natural population as well as the laboratory populations sampled from it. So far this has largely been a contrast between lab and wild flies in the areas that I pulled out, but that might also have to do with the order of samples I've added. 
+b) in the second case, where the introgression occurs after the flies are brought into the lab (maybe some sims get into the wrong vial or something). Then, no wild sechellias will be sim-like but some lab sechellias will. 
+3) if the introgression is common in the lab but not in the wild, it might be an adaptation to lab conditions. but, the population genetic statistics we've been looking at have been drawn from the wild populations (so we might not see marks of selection there!)
+
+
+May be useful: ggtree
+https://bioconductor.org/packages/release/bioc/vignettes/ggtree/inst/doc/treeVisualization.html
+
+
+
 
 biocLite("HelloRanges")
 

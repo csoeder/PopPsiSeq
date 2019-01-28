@@ -449,7 +449,7 @@ rule pairwise_VCF_distance_metric_windowed:
 		pairdist_out = ["variants/{prefix}.vs_{ref_genome}.{aligner}/distances/{indiv_1}/{indiv_2}.{window_prefix}.bed","variants/{prefix}.vs_{ref_genome}.{aligner}/distances/{indiv_2}/{indiv_1}.{window_prefix}.bed"]
 	params:
 		runmem_gb=16,
-		runtime = "1:00:00",
+		runtime = "4:00:00",
 		cores=2,
 	run:
 		shell(
