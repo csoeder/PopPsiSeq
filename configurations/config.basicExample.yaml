@@ -1,0 +1,107 @@
+data_sets:
+    - name: SRR869587
+      paired: True
+      path: data/external/sequence/paired_end/SRR869587/
+      experimental: lab-reared sechellia
+      readsfile1: SRR869587_1.fastq
+      readsfile2: SRR869587_2.fastq
+      source: NCBI
+      SRA: SRR869587
+      species: drosophila sechellia
+      subgroups: [all,test, labSech,sechTest, allSech]
+    - name: SRR6426002
+      paired: True
+      path: data/external/sequence/paired_end/SRR6426002/
+      experimental: lab-reared sechellia
+      readsfile1: SRR6426002_1.fastq
+      readsfile2: SRR6426002_2.fastq
+      source: NCBI
+      SRA: SRR6426002
+      species: drosophila sechellia
+      subgroups: [all,test, labSech,sechTest, allSech]
+    - name: SRR15202878
+      paired: True
+      path: data/external/sequence/paired_end/SRR15202878/
+      experimental: lab-reared sechellia
+      readsfile1: SRR15202878_1.fastq
+      readsfile2: SRR15202878_2.fastq
+      source: NCBI
+      SRA: SRR15202878
+      species: drosophila sechellia
+      subgroups: [all,test, labSech,sechTest, allSech]
+    - name: SRR8840592
+      paired: True
+      path: data/external/sequence/paired_end/SRR8840592/
+      experimental: lab-reared sechellia
+      readsfile1: SRR8840592_1.fastq
+      readsfile2: SRR8840592_2.fastq
+      source: NCBI
+      SRA: SRR8840592
+      species: drosophila sechellia
+      subgroups: [all,test, labSech,sechTest, allSech]
+
+
+    - name: ERR1597895
+      paired: True
+      path: data/external/sequence/paired_end/ERR1597895/
+      experimental: simulans
+      readsfile1: ERR1597895_1.fastq
+      readsfile2: ERR1597895_2.fastq
+      source: NCBI
+      SRA: ERR1597895
+      species: drosophila simulans
+      subgroups: [all,test, labSim,allSim,sechTest]
+    - name: ERR1597896
+      paired: True
+      path: data/external/sequence/paired_end/ERR1597896/
+      experimental: simulans
+      readsfile1: ERR1597896_1.fastq
+      readsfile2: ERR1597896_2.fastq
+      source: NCBI
+      SRA: ERR1597896
+      species: drosophila simulans
+      subgroups: [all,test, labSim,allSim,sechTest]
+    - name: ERR1597899
+      paired: True
+      path: data/external/sequence/paired_end/ERR1597899/
+      experimental: simulans
+      readsfile1: ERR1597899_1.fastq
+      readsfile2: ERR1597899_2.fastq
+      source: NCBI
+      SRA: ERR1597899
+      species: drosophila simulans
+      subgroups: [all,test, labSim,allSim,sechTest]
+    - name: ERR1597900
+      paired: True
+      path: data/external/sequence/paired_end/ERR1597900/
+      experimental: simulans
+      readsfile1: ERR1597900_1.fastq
+      readsfile2: ERR1597900_2.fastq
+      source: NCBI
+      SRA: ERR1597900
+      species: drosophila simulans
+      subgroups: [all,test, labSim,allSim,sechTest]
+
+    - name: Earley2011
+      paired: False
+      path: data/external/sequence/single_end/SRR303333/
+      experimental: selection
+      readsfile: SRR303333.fastq
+      source: NCBI
+      SRA: SRR303333
+      pub: Earley2011
+      subgroups: [all,selection,Earley2011,EarleyAll, cleanEarleyAll]
+
+reference_genomes:
+    - name: droSim1
+      species: drosophila simulans
+      path: /proj/cdjones_lab/Genomics_Data_Commons/genomes/drosophila_simulans/droSim1.fa
+      fai: /proj/cdjones_lab/Genomics_Data_Commons/genomes/drosophila_simulans/droSim1.fa.fai
+      source: UCSC Genome Browser
+    - name: dm6
+      species: drosophila melanogaster
+      path: /proj/cdjones_lab/Genomics_Data_Commons/genomes/drosophila_melanogaster/dm6.fa
+      fai: /proj/cdjones_lab/Genomics_Data_Commons/genomes/drosophila_melanogaster/dm6.fa.fai
+      source: UCSC Genome Browser
+
+

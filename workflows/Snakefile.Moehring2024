@@ -1,0 +1,446 @@
+include: "Snakefile.legacy"
+include: "Snakefile.popgentools"
+
+annotation_by_name = { a['name'] : a for a in config['annotations']}
+
+
+############################################################################  
+#######		writeup	and timestamp ####
+############################################################################  
+
+
+rule all:
+	input: 
+		pdf_out="results/Moehring_PopPsiSeq.pdf",
+	params:
+		runmem_gb=1,
+		runtime="0:01:00",
+		cores=1,
+	run:
+		shell(""" mkdir -p results/figures/; touch results/figures/null.png; for fig in results/figures/*png; do mv $fig $(echo $fig| rev | cut -f 2- -d . | rev ).$(date +%d_%b_%Y).png; done;  rm results/figures/null.*.png; """)
+		shell(""" mkdir -p results/figures/supp/ ; touch results/figures/supp/null.png; for fig in results/figures/supp/*png; do mv $fig $(echo $fig| rev | cut -f 2- -d . | rev ).$(date +%d_%b_%Y).png; done; rm results/figures/supp/null.*.png; """)
+
+		shell(""" mkdir -p results/tables/ ; touch results/tables/null.tmp ; for phial in $(ls -p results/tables/ | grep -v /); do pre=$(echo $phial | rev | cut -f 2- -d . | rev ); suff=$(echo $phial | rev | cut -f 1 -d . | rev ); mv results/tables/$phial results/tables/$pre.$(date +%d_%b_%Y).$suff; done ; rm results/tables/null.*.tmp; """)
+		shell(""" mkdir -p results/tables/supp/ ; touch results/tables/supp/null.tmp ; for phial in $(ls -p results/tables/supp/ | grep -v /); do pre=$(echo $phial | rev | cut -f 2- -d . | rev ); suff=$(echo $phial | rev | cut -f 1 -d . | rev ); mv results/tables/supp/$phial results/tables/supp/$pre.$(date +%d_%b_%Y).$suff; done ; rm results/tables/supp/null.*.tmp; """)
+
+		shell(""" mv results/Moehring_PopPsiSeq.pdf results/Moehring_PopPsiSeq.$(date +%d_%b_%Y).pdf """)
+		shell(""" tar cf Moehring_PopPsiSeq.$(date +%d_%b_%Y).tar results/ """)
+
+
+rule write_report:
+	input:
+		reference_summary = ["data/summaries/reference_genomes/reference_genomes.summary", "data/summaries/reference_annotations/reference_annotations.summary"],
+		sequenced_reads_summary=["data/summaries/intermediate/FASTP/all.sequenced_reads.dat"],
+		alignment_summaries = expand("data/summaries/intermediate/BAMs/all.vs_{ref_gen}.{aligner}.summary", ref_gen=['droSim1', 'ncbiMau','prinDsim3'], aligner=['bwa','bwaUniq']),
+
+		PsiSeq_legacy = expand("data/ultimate/shared_SNPs/PsiSeq{version}/droSim1/bwaUniq/{sample_1}.SNPs_shared_with.{sample_2}.vs_droSim1.bwaUniq.genomeWindowed_w100000_s50000.bed", sample_1 = ["BCM10F", "BCM10NE", "BCS10F", "BCS10NE", "mauGFP", "simGFP"], sample_2 = ["BCM10F", "BCM10NE", "BCS10F", "BCS10NE", "mauGFP", "simGFP"], version = ["","2", "2_relaxed"]),
+
+		std_freebayes_bin = expand("data/ultimate/freq_shift/freebayes/all.simBackcrossMutant_with_simulans_and_mauritiana.vs_droSim1.bwaUniq.snpBinned_{bins}.frqShift.bed", sample = ["simBackcrossMutant","simBackcrossNormal","mauritiana"], bins = ["b120_s60", "b12500_s6250", "b1250_s625"]),
+		std_freebayes_winSize = expand("data/ultimate/freq_shift/freebayes/all.simBackcrossNormal_with_simulans_and_mauritiana.vs_droSim1.bwaUniq.windowed_{wins}.frqShift.bed", sample = ["simBackcrossMutant","simBackcrossNormal","mauritiana"], wins = ["w10000_s5000","w1000000_s500000"]),
+		std_freebayes = expand("data/ultimate/freq_shift/freebayes/all.{sample}_with_simulans_and_mauritiana.vs_droSim1.bwaUniq.windowed_w100000_s50000.frqShift.bed", sample = ["mauBackcrossMutant","mauBackcrossNormal","mauritiana","mauritianaBackcross","mutantSperm","normalSperm","simBackcrossMutant","simBackcrossNormal","simulans","simulansBackcross"]),
+		smrt_freebayes = expand("data/ultimate/freq_shift/smrtFreeBayes/all.{sample}_with_simulans_and_mauritiana.vs_prinDsim3.bwaUniq.windowed_w100000_s50000.frqShift.bed", sample = ["mauBackcrossMutant","mauBackcrossNormal","mauritiana","mauritianaBackcross","mutantSperm","normalSperm","simBackcrossMutant","simBackcrossNormal","simulans","simulansBackcross"], ref_genome = ["prinDsim3", "droSim1"]),
+
+		popgen = ["data/intermediate/population_genetics/heterozygosity/freebayes/all.vs_droSim1.bwaUniq.het.w100000_s50000.bg"],
+
+	output:
+		pdf_out="results/Moehring_PopPsiSeq.pdf"
+	params:
+		runmem_gb=8,
+		runtime="1:00:00",
+		cores=2,
+	message:
+		"writing up the results.... "
+	run:
+		pandoc_path="/nas/longleaf/apps/rstudio/2021.09.2-382/bin/pandoc"
+		pwd = subprocess.check_output("pwd",shell=True).decode().rstrip()+"/"
+		shell("""mkdir -p results/figures/supp/ results/tables/supp/""")
+		shell(""" R -e "setwd('{pwd}');Sys.setenv(RSTUDIO_PANDOC='{pandoc_path}')" -e  "peaDubDee='{pwd}'; rmarkdown::render('scripts/Moehring_PopPsiSeq.Rmd',output_file='{pwd}{output.pdf_out}')"  """)
+#               shell(""" tar cf results.tar results/ """)
+
+
+
+
+rule annotation_reporter:
+	input:
+		annot = lambda wildcards: annotation_by_name[wildcards.annot_name]["gtf_path"]
+	output:
+		report_out = "data/summaries/reference_annotations/{annot_name}.stats"
+	params:
+		runmem_gb=1,
+		runtime="5:00",
+		cores=1,
+	run:
+		shell(""" mkdir -p data/summaries/reference_annotations/ """)
+		shell(""" rm -f {output.report_out} """)
+		shell(""" cat {input.annot} | awk '{{if($3=="gene")print;}}' | gtf2bed | cut -f 1-6 | cut -f 1  | sort | uniq -c | tr -s " " | tr " " "\t" | awk '{{print"count\t"$2"\t"$1}}' >> {output.report_out} """)
+		shell(""" cat {input.annot} | awk '{{if($3=="gene")print;}}' | gtf2bed | cut -f 1-6 | wc -l | awk '{{print"count\ttotal\t"$0}}' >> {output.report_out} """)
+		shell(""" cat {input.annot} | awk '{{if($3=="gene")print;}}' | gtf2bed | cut -f 1-6 | awk '{{print$3-$2;}}' | awk '{{sum+=$1; sumsq+=$1*$1}} END {{ print "size\ttotal\t",sum; print "size\tavg\t",sum/NR; print "size\tstd\t",sqrt(sumsq/NR - (sum/NR)**2)}}'  >> {output.report_out} """)
+
+rule summon_annotation_summaries:
+	input:
+		refgen_reports = lambda wildcards: expand("data/summaries/reference_annotations/{ref_ann}.stats", ref_ann= [a["name"] for a in config['annotations']  ] ) # annotation_by_name.keys())
+	output:
+		refann_summary = "data/summaries/reference_annotations/reference_annotations.summary"
+	params:
+		runmem_gb=1,
+		runtime="5:00",
+		cores=1,
+	run:
+		print([a["name"] for a in config['annotations'] ])
+		shell(""" rm -f {output.refann_summary} """)
+		for anne in [a["name"] for a in config['annotations']  ]:
+			shell(""" cat data/summaries/reference_annotations/{anne}.stats | awk '{{print"{anne}\t"$0}}' >> {output.refann_summary}""")
+
+############################################################################  
+#######		Call variants from mapped reads 	####
+############################################################################  
+
+# rule joint_vcf_caller_parallel_stdFB:
+	# input:
+		# bams_in = lambda wildcards: expand("data/intermediate/mapped_reads/{aligner}/{sample}.vs_{ref_genome}.{aligner}.sort.bam", sample=sampname_by_group[wildcards.group], ref_genome=wildcards.ref_genome, aligner=wildcards.aligner),
+		# windows_in = "utils/{ref_genome}_w100000_s100000.windows.bed"
+	# output:
+		# vcf_out = "data/intermediate/variants/stdFreeBayes/{group}.vs_{ref_genome}.{aligner}.vcf"
+	# params:
+		# freebayes="--standard-filters",
+		# runmem_gb=64,
+		# runtime="1-00:00:00",
+		# cores=18,
+	# message:
+		# "Jointly calling variants from all samples mapped to \ {wildcards.ref_genome} \ with \ {wildcards.aligner} \ "
+	# run:
+		# ref_genome_file=ref_genome_by_name[wildcards.ref_genome]['path']
+		# shell("""mkdir -p data/intermediate/variants/stdFreeBayes/ """)
+		# shell("""cat {input.windows_in}| awk '{{print$1":"$2"-"$3}}' > {input.windows_in}.rfmt""")
+		# shell("scripts/freebayes-parallel {input.windows_in}.rfmt {params.cores} {params.freebayes} -f {ref_genome_file} {input.bams_in} | vcftools --remove-indels --vcf - --recode --recode-INFO-all --stdout  > {output.vcf_out} ")
+		# #shell("~/modules/freebayes/scripts/freebayes-parallel {input.windows_in}.rfmt {params.cores}  --standard-filters -f {ref_genome_file} {input.bams_in} | vcftools --remove-indels --vcf - --recode --recode-INFO-all --stdout  > {output.vcf_out} ")
+		# #shell("freebayes {params.freebayes} -f {ref_genome_file} {input.bams_in} | vcftools --remove-indels --vcf - --recode --recode-INFO-all --stdout  > {output.vcf_out}")
+
+
+
+rule cnv_bed_file_maker:
+	input:
+#		bams_in = lambda wildcards: expand("data/intermediate/mapped_reads/{aligner}/{sample}.vs_{ref_genome}.{aligner}.sort.bam", sample=sampname_by_group[wildcards.group], ref_genome=wildcards.ref_genome, aligner=wildcards.aligner),
+#		windows_in = "utils/{ref_genome}_w100000_s100000.windows.bed"
+	output:
+		cnv_out = "data/intermediate/variants/{group}.cnv_in.{ref_genome}.bed"
+	params:
+		hapcopynum=30,
+		runmem_gb=1,
+		runtime="00:10:00",
+		cores=1,
+	message:
+		" "
+	run:
+		shell(""" rm -rf {output.cnv_out} """)
+		fai=ref_genome_by_name[wildcards.ref_genome]['path']+".fai"
+		for samp in sampname_by_group[wildcards.group]:
+			if wildcards.ref_genome == "droSim1":
+				shell(""" cat {fai} | grep "chr[XY]" | awk '{{print$1"\t1\t"$2"\t{samp}\t{params.hapcopynum}"}}' >> {output.cnv_out} || true """)
+			elif wildcards.ref_genome == "prinDsim3":
+				shell(""" cat {fai} | grep -w "NC_052525.2" | awk '{{print$1"\t1\t"$2"\t{samp}\t{params.hapcopynum}"}}' >> {output.cnv_out} || true """)
+
+
+#cnv bed file format: reference sequence, start, end, sample name, copy number
+#male flies, ie haploid in both sex chroms
+# only works on well consolidated chrom
+
+
+rule joint_vcf_caller_parallel_smrtFB:
+	input:
+		bams_in = lambda wildcards: expand("data/intermediate/mapped_reads/{aligner}/{sample}.vs_{ref_genome}.{aligner}.sort.bam", sample=sampname_by_group[wildcards.group], ref_genome=wildcards.ref_genome, aligner=wildcards.aligner),
+		windows_in = "utils/genome_windows/{ref_genome}_w100000_s100000.windows.bed",
+		cnv_bed =  "data/intermediate/variants/{group}.cnv_in.{ref_genome}.bed", 
+	output:
+		vcf_out = "data/intermediate/variants/smrtFreeBayes/{group}.vs_{ref_genome}.{aligner}.vcf"
+	params:
+		freebayes=" --standard-filters --strict-vcf --use-best-n-alleles 8  --pooled-discrete --ploidy 60 ",# 30 flies per sample, diploid unless cnv_bed sez otherwise
+#		freebayes=" --standard-filters --strict-vcf --use-best-n-alleles 8  --pooled-continuous --pooled-discrete --ploidy 60 ",# 30 flies per sample, diploid unless cnv_bed sez otherwise
+#		freebayes=" --standard-filters --strict-vcf --use-best-n-alleles 8  --pooled-continuous --pooled-discrete --ploidy 60 ",# 30 flies per sample, diploid unless cnv_bed sez otherwise
+		runmem_gb=64,
+		runtime="1-00:00:00",
+		cores=18,
+	message:
+		"Jointly calling variants from all samples mapped to \ {wildcards.ref_genome} \ with \ {wildcards.aligner} \ "
+	run:
+		ref_genome_file=ref_genome_by_name[wildcards.ref_genome]['path']
+
+
+		shell("""mkdir -p data/intermediate/variants/smrtFreeBayes/ """)
+		shell("""cat {input.windows_in}| awk '{{print$1":"$2"-"$3}}' > {input.windows_in}.rfmt""")
+		shell("scripts/freebayes-parallel {input.windows_in}.rfmt {params.cores} --cnv-map {input.cnv_bed}  {params.freebayes} -f {ref_genome_file} {input.bams_in} | bcftools view  --types snps  > {output.vcf_out} ")
+
+
+rule better_vcf_reporter:
+	input:
+		vcf_in = "data/intermediate/variants/{caller}/{prefix}.vs_{ref_genome}.{aligner}.vcf"
+	output:
+		report_out = "data/summaries/intermediate/VCFs/{ref_genome}/{caller}/{prefix}.vs_{ref_genome}.{aligner}.summary",
+		frq_out = "data/intermediate/frequencies/{caller}/{prefix}.vs_{ref_genome}.{aligner}.frq"
+	params:
+		ploidy=30.,
+		runmem_gb=8,
+		runtime="4:00:00",
+		cores=4,
+#	message:
+#		"Collecting metadata for the {wildcards.aligner} alignment of {wildcards.sample} to {wildcards.ref_genome}.... "
+	run:
+		shell("""
+		mkdir -p data/intermediate/frequencies/{wildcards.caller}/ data/summaries/intermediate/VCFs/{wildcards.ref_genome}/{wildcards.caller}/
+		""")
+
+		shell("""
+		cat {input.vcf_in}  | grep -v "#" | cut -f 1 | sort | uniq -c > {output.report_out}.snpsPerContig.tmp
+		cat {output.report_out}.snpsPerContig.tmp | awk '{{sum+=$1}} END {{ print sum,"\ttotal"}}' | cat {output.report_out}.snpsPerContig.tmp - > {output.report_out}.snpsPerContig
+		rm {output.report_out}.snpsPerContig.tmp
+		ref_genome={wildcards.ref_genome}
+		tail -n 1 {output.report_out}.snpsPerContig | awk '{{print "total_snp_count\t"$1}}' | sed -e 's/^/{wildcards.ref_genome}\t/g' > {output.report_out}
+		""")
+		
+		if wildcards.caller in ["freebayes"]:
+			shell("""
+		vcftools  --vcf {input.vcf_in} --out {output.report_out} --freq 
+		vcftools  --vcf {input.vcf_in} --out {output.report_out} --counts
+		vcftools  --vcf {input.vcf_in} --out {output.report_out} --missing-indv
+		vcftools  --vcf {input.vcf_in} --out {output.report_out} --missing-site
+		vcftools  --vcf {input.vcf_in} --out {output.report_out} --singletons
+
+		""")
+				
+		elif wildcards.caller in ["smrtFreeBayes"]:
+			shell("""
+			cat {input.vcf_in} | bcftools query -f '%CHROM\t%POS\t%AN\t%REF\t%ALT\t%N_PASS(GT!="mis")\t[%GT/]\n' > {output.frq_out}.tmp
+			""")
+			f_read = open(output.frq_out+".tmp", "r")
+			lions = f_read.readlines()
+			f_read.close()
+
+			lions = [l.strip().split("\t") for l in lions]
+		
+			f_write = open(output.report_out+".frq.count", "w")
+			f_write.write("CHROM\tPOS\tN_ALLELES\tN_CHR\t{ALLELE:FREQ}\n")
+
+			for lyin in lions:
+				gnu_lion = lyin[:2]
+				gnu_lion.append(len(lyin[3]) + len(lyin[4].split(","))) # number alleles
+#				num_chrom = float(lyin[5]) * 2 * params.ploidy # number of samples, with 30 diploid individuals per sample  
+				num_chrom = lyin[-1].count("0") +lyin[-1].count("1")  
+				gnu_lion.append(num_chrom) # number chromosomes
+
+				gnu_lion.append("%s:%s" % (lyin[3], lyin[-1].count("0") )) # number chromosomes
+				gnu_lion.append("%s:%s" % (lyin[4], lyin[-1].count("1") )) # number chromosomes
+				f_write.write("\t".join([str(x) for x in gnu_lion])+"\n")
+				
+			f_write.close()
+				
+			f_write = open(output.report_out+".frq", "w")
+			f_write.write("CHROM\tPOS\tN_ALLELES\tN_CHR\t{ALLELE:FREQ}\n")
+
+			for lyin in lions:
+				gnu_lion = lyin[:2]
+				gnu_lion.append(len(lyin[3]) + len(lyin[4].split(","))) # number alleles
+				#num_chrom = float(lyin[5]) * 2 * params.ploidy # number of samples, with 30 diploid individuals per sample 
+				num_chrom = lyin[-1].count("0") +lyin[-1].count("1")  
+ 
+				gnu_lion.append(num_chrom) # number chromosomes
+
+				gnu_lion.append("%s:%s" % (lyin[3], lyin[-1].count("0")/num_chrom )) # number chromosomes
+				gnu_lion.append("%s:%s" % (lyin[4], lyin[-1].count("1")/num_chrom )) # number chromosomes
+				f_write.write("\t".join([str(x) for x in gnu_lion])+"\n")
+			f_write.close()
+			shell(""" rm {output.frq_out}.tmp""")
+
+		shell("""
+				cat {output.report_out}.frq | tail -n +2 | awk '{{print $1,$2,$2+1,$4,$5,$6}}' | tr " " "\t" > {output.frq_out}
+		""")
+
+	#cat  all_samples.vs_droSec1.bwaUniq.summary.frq.count| cut -f 3 | tail -n +2 | sort | uniq -c
+	#####	bi, tri, and quadralelic counts ^^ 
+	#replace some of this with vcftools::vcf-stats ?
+ruleorder: better_vcf_reporter > vcf_reporter
+
+
+rule local_summon_VCF_analytics_base:
+	input:
+		bam_reports = lambda wildcards: expand("data/summaries/intermediate/VCFs/{ref_genome}/{caller}/{prefix}.vs_{ref_genome}.{aligner}.summary", prefix=wildcards.prefix, ref_genome=["droSim1", "ncbiMau"], aligner="bwaUniq", caller = ["stdFreeBayes","smrtFreeBayes"])
+	output:
+		full_report = "data/summaries/intermediate/VCFs/{prefix}.calledVariants.{aligner}.summary"
+	params:
+		runmem_gb=1,
+		runtime="1:00",
+		cores=1,
+	message:
+		"collecting all alignment metadata.... "
+	run:
+
+		shell(""" rm -f {output.full_report} """)
+		for caller in ["stdFreeBayes","smrtFreeBayes",]:
+			for ref_genome in ["droSim1", "ncbiMau"]:
+				shell(""" cat data/summaries/intermediate/VCFs/{ref_genome}/{caller}/{wildcards.prefix}.vs_{ref_genome}.{wildcards.aligner}.summary | awk '{{print"{wildcards.prefix}\t{caller}\t"$0}}' >> {output.full_report} """)
+
+
+# rule subset_VCF_to_subgroup:
+	# input:
+		# vcf_in = "data/intermediate/variants/{prefix}/{group,[^\/]+}.vs_{ref_genome}.{aligner}.vcf"
+	# output:
+		# vcf_out = "data/intermediate/variants/{prefix}/{group,[^\/]+}.subset_{subgroup}.vs_{ref_genome}.{aligner}.vcf"
+	# params:
+		# runmem_gb=8,
+		# runtime = "1:00:00",
+		# cores=2,
+	# message:
+		# "Subsetting the variant file \ {input.vcf_in} \ to the individuals in the subgroup \ {wildcards.subgroup} \ .... "
+	# run:
+
+		# member_list = "%s,"*len(sampname_by_group[wildcards.subgroup]) % tuple(sampname_by_group[wildcards.subgroup])
+		
+		# # filter_string = " --min-alleles 2 --max-alleles 2  --max-missing-count 0" # --non-ref-ac-any 1" # only biallelic sites, no missing genotypes, invariant sites allowed b/c they might vary relative to a different subgroup
+		# # shell("vcf-subset {input.vcf_in} -u -c {member_list} | vcftools {filter_string} --vcf - --recode --stdout > {output.vcf_out}")
+
+		# filter_string = " --min-alleles 2 --max-alleles 2 --types snps --exclude 'F_MISSING>0' "
+		# shell("vcf-subset {input.vcf_in} -u -c {member_list} | bcftools +fill-tags -  -- -t AF,AC,F_MISSING,NS,AN | bcftools view {filter_string}  > {output.vcf_out}")
+
+
+
+############################################################################  
+#######		other VCF statistics 	####
+############################################################################  
+
+rule population_VCF_het:
+	input: 
+		varz = "data/intermediate/variants/{prefix}.vs_{ref_genome}.{aligner}.vcf", 
+		windows_in = "utils/genome_windows/{ref_genome}_w{window_size}_s{slide_rate}.windows.bed",
+	output:
+		het_out = "data/intermediate/population_genetics/heterozygosity/{prefix}.vs_{ref_genome}.{aligner}.het.w{window_size}_s{slide_rate}.bg",
+	params:
+		runmem_gb=8,
+		runtime="12:00:00",
+		cores=8,
+		win_size = 10000,
+	run:
+
+		shell(""" mkdir -p data/intermediate/population_genetics/heterozygosity/; rm -rf {output.het_out}; bgzip --stdout {input.varz} > {input.varz}.bgz; tabix {input.varz}.bgz ;  """)
+		shell(""" 
+while read -r line; do 
+	echo $line;
+	echo $line | tr " " "\t" > {output.het_out}.tmp.bed ; 
+	bcftools view -R {output.het_out}.tmp.bed {input.varz}.bgz | vcftools --vcf - --het --stdout | tail -n +2 | awk -v s="$line" '{{print s"\t0\t*\t"$0}}' | tr " " "\t" >> {output.het_out}
+done < {input.windows_in}
+
+ """)
+		shell(""" rm -rf {input.varz}.bgz* ;  """)
+
+
+
+############################################################################  
+#######		background distribution	####
+############################################################################  
+
+
+rule genelist2genebed:
+	input:
+		gene_list='utils/genelists/{ref_gen}/{genelist}.list',
+	output:
+		#windowed_out = "data/ultimate/freq_shift/{var_caller}/{frqshft_prefix}.listWindowed_l{slopsize}.frqShift.bed"
+		gene_bed = "utils/genelists/{ref_gen}/{genelist}.listWindowed_l{slopsize,[0-9]+}.bed"
+	params:
+		runmem_gb=8,
+		runtime="1:00:00",
+		cores=8,
+	run:
+		egg = annotation_by_name["NCBIsim103"]["gtf_path"]
+		fai = ref_genome_by_name[wildcards.ref_gen]["path"]+".fai"
+		shell(""" grep -wFf <(  cat {input.gene_list} | cut -f 1 ) {egg} | awk '{{if($3=="gene")print;}}' | cut -f 1,4,5,9 | cut -f 1,2 -d '"' | sed -e 's/gene_id "//g' | bedtools slop -i - -g {fai} -b {wildcards.slopsize} > {output.gene_bed} """ )
+
+
+rule shuffle_genebed:
+	input:
+		gene_bed = "utils/genelists/{ref_gen}/{genelist}.listWindowed_l{slopsize,[0-9]+}.bed"
+	output:
+		#windowed_out = "data/ultimate/freq_shift/{var_caller}/{frqshft_prefix}.listWindowed_l{slopsize}.frqShift.bed"
+		shuff_bed = "utils/genelists/{ref_gen}/{genelist}.listWindowed_l{slopsize,[0-9]+}_f{replicate}.bed"
+	params:
+		runmem_gb=8,
+		runtime="1:00:00",
+		cores=8,
+	run:
+#		egg = annotation_by_name["NCBIsim103"]["gtf_path"]
+		fai = ref_genome_by_name[wildcards.ref_gen]["path"]+".fai"
+		shell(""" bedtools shuffle -chrom -noOverlapping -i {input.gene_bed} -g {fai} > {output.shuff_bed}""" )
+
+rule resample_genebed:
+	input:
+		gene_bed = "utils/genelists/{ref_gen}/{genelist}.listWindowed_l{slopsize,[0-9]+}.bed"
+	output:
+		#windowed_out = "data/ultimate/freq_shift/{var_caller}/{frqshft_prefix}.listWindowed_l{slopsize}.frqShift.bed"
+		resamp_bed = "utils/genelists/{ref_gen}/{genelist}.listWindowed_l{slopsize,[0-9]+}_m{replicate}.bed"
+	params:
+		runmem_gb=8,
+		runtime="1:00:00",
+		cores=8,
+	run:
+		shell(""" rm -f {output.resamp_bed} """)
+		egg = annotation_by_name["NCBIsim103"]["gtf_path"]
+		fai = ref_genome_by_name[wildcards.ref_gen]["path"]+".fai"
+#		pull_string = """awk '{{if(\$3==\"gene\")print;}}'"""
+#		shell(""" cat {input.gene_bed} | cut -f 1 | sort | uniq -c | awk -var awkward="{pull_string}" '{{ print " cat {egg} | "awkward" | sort -R | grep -w "$2" | head -n "$1}}' | sh  | cut -f 1,4,5,9 | cut -f 1,2 -d '"' | sed -e 's/gene_id "//g' | bedtools slop -i - -g {fai} -b {wildcards.slopsize} > {output.resamp_bed} """ )
+		shell(""" cat {input.gene_bed} | cut -f 1 | sort | uniq -c | awk '{{print "cat {egg} | awk ~{{if($1 == \\""$2"\\" && $3 == \\"gene\\")print;}}~ |sort -R |  head -n "$1" | gtf2bed | cut -f 1-6 | bedtools  slop -i - -g {fai} -b {wildcards.slopsize} | cut -f 1-4 >> {output.resamp_bed} "}}' | tr "~" "'" | sh """ )
+
+
+
+rule genelist_frq_shift:
+	input:
+#		shared_snps='data/intermediate/shared_snps/PsiSeq/{ref_genome}/{aligner}/{sample}.SNPs_shared_with.{eff_naught}.vs_{ref_genome}.{aligner}.bed'
+#		shared_snps='data/intermediate/shared_snps/PsiSeq2/{ref_genome}/{aligner}/{sample}_in_{eff_naught}.vs_{ref_genome}.{aligner}.sharedSNPs.bed'
+		frqShft_in = "data/intermediate/freq_shift/{frqshft_prefix}.vs_{ref_genome}.{aligner}.frqShift",
+		windows_in = "utils/genelists/{ref_genome}/{genelist}.listWindowed_{list_suffix}.bed"
+	output:
+		windowed_out = "data/ultimate/freq_shift/{frqshft_prefix}.vs_{ref_genome}.{aligner}.{genelist}_listWindowed_{list_suffix}.frqShift.bed"
+	params:
+		runmem_gb=32,
+		runtime="1:00:00",
+		cores=4,
+	shell:
+		"""
+		mkdir -p data/ultimate/freq_shift/
+		bedtools map -c 7,8,8 -o sum,sum,count -null NA -a <( cat {input.windows_in} | bedtools sort -i -)  -b <( tail -n +2  {input.frqShft_in} | cut -f  1-3,15,16 | nl | tr -d " " | awk '{{if( $5!="NA" && $6!="NA")print $2,$3,$4,$1,"0",".",$5,$6}}' | tr " " "\t"| bedtools sort -i - ) > {output.windowed_out}
+  		"""
+
+
+############################################################################  
+#######		relaxed PsiSeq2	####
+############################################################################  
+
+rule PsiSeq2_relaxed:
+	input:
+		offspring_mpile='data/intermediate/mapped_reads/{aligner}/{sample}.vs_{ref_genome}.{aligner}.mpileup',
+		otherparent_mpile="data/intermediate/mapped_reads/{aligner}/{eff_naught}.vs_{ref_genome}.{aligner}.mpileup",
+	output:
+#		shared_snps='data/intermediate/shared_snps/PsiSeq2/{ref_genome}/{aligner}/{sample}_in_{eff_naught}.vs_{ref_genome}.{aligner}.sharedSNPs.bed'
+		shared_snps='data/intermediate/shared_snps/PsiSeq2_relaxed/{ref_genome}/{aligner}/{sample}.SNPs_shared_with.{eff_naught}.vs_{ref_genome}.{aligner}.bed'
+#		shared_snps='variant_comparisons/{sample}_and_{compare}_vs_{parent}.{aligner}.sharedSnps.out'
+	params:
+		minCov=3,
+		runmem_gb=64,
+		minFrac=0.5,
+		cores=8,
+		runtime="6:00:00"
+	run:
+		uniq1 = subprocess.check_output(""" echo $(date +%N)*$(date +%N) | bc | md5sum | cut -f 1 -d " "  """  ,shell=True).decode().rstrip()[-5:].upper()		
+		uniq2 = subprocess.check_output(""" echo $(date +%N)*$(date +%N) | bc | md5sum | cut -f 1 -d " "  """  ,shell=True).decode().rstrip()[-5:].upper()		
+		shell(""" mkdir -p data/intermediate/shared_snps/PsiSeq2/{wildcards.ref_genome}/{wildcards.aligner}/  """)
+		shell(""" cat {input.offspring_mpile} | awk '{{if($4 >= {params.minCov})print;}}' > {input.offspring_mpile}.filtCov.{wildcards.eff_naught}.{uniq1} """)
+		shell(""" cat {input.otherparent_mpile}| awk '{{if($4 >= {params.minCov})print;}}' > {input.otherparent_mpile}.filtCov.{wildcards.sample}.{uniq2} """)
+		fai = ref_genome_by_name[wildcards.ref_genome]["fai"]
+		shell("python3 scripts/legacy/PsiSeq2/shared_snps.v4.py -vvvvv -c {params.minCov} -f {params.minFrac} -F {fai} {input.offspring_mpile}.filtCov.{wildcards.eff_naught}.{uniq1} {input.otherparent_mpile}.filtCov.{wildcards.sample}.{uniq2} {output.shared_snps}.tmp ")
+		shell(" cat {output.shared_snps}.tmp | bedtools sort > {output.shared_snps} ")
+		shell("rm {output.shared_snps}.tmp ") 
+		#shell(" echo {input.offspring_mpile}.filtCov.{wildcards.eff_naught}.{uniquifier} {input.otherparent_mpile}.filtCov.{wildcards.sample}.{uniquifier} ")
+		shell(" head {input.offspring_mpile}.filtCov.{wildcards.eff_naught}.{uniq1} {input.otherparent_mpile}.filtCov.{wildcards.sample}.{uniq2} ")
+		#shell(" mv {input.offspring_mpile}.filtCov.{wildcards.eff_naught}.{uniquifier} {input.otherparent_mpile}.filtCov.{wildcards.sample}.{uniquifier} ")
+		shell(" rm {input.offspring_mpile}.filtCov.{wildcards.eff_naught}.{uniq1}  ")
+		shell(" rm {input.otherparent_mpile}.filtCov.{wildcards.sample}.{uniq2}  ")
+
+
+
+

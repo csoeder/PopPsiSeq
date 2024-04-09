@@ -1,12 +1,23 @@
-configfile: 'config.yaml'
+#configfile: 'config.yaml'
 
-#module load python/3.5.1 samtools freebayes vcftools bwa bedtools r/3.5.0 rstudio/1.1.453
+from Bio import SeqIO
+
+# module load python/3.9.6 sratoolkit samtools freebayes vcftools bwa bedtools r/4.2.2 rstudio
 #PATH=$PATH:/nas/longleaf/home/csoeder/modules/vcflib/bin:/nas/longleaf/home/csoeder/modules/parallel/bin
 
 
 sample_by_name = {c['name'] : c for c in config['data_sets']}
 ref_genome_by_name = { g['name'] : g for g in config['reference_genomes']}
+
+try:
+	chain_dict_by_destination = config['lift_genomes']
+except KeyError:
+	chain_dict_by_destination = {}
+
 sampname_by_group = {}
+sampname_by_sra = {}
+#print(sample_by_name)
+
 for s in sample_by_name.keys():
 	subgroup_lst = sample_by_name[s]['subgroups']
 	for g in subgroup_lst:
@@ -15,7 +26,10 @@ for s in sample_by_name.keys():
 		else:
 			sampname_by_group[g] = [s]
 
-
+	try:
+		sampname_by_sra[sample_by_name[s]['SRA']] = s
+	except KeyError:
+		pass
 
 
 def return_filename_by_sampname(sampname):
@@ -34,27 +48,31 @@ def return_file_relpath_by_sampname(wildcards):
 	pathsout = ["".join([pathprefix, fq]) for fq in filesin]
 	return pathsout
 
+############################################################################  
+#######		background data, eg reference genomes 	####
+############################################################################  
+
 
 rule reference_genome_reporter:
 	input:
 		fai_in = lambda wildcards: ref_genome_by_name[wildcards.ref_gen]['fai'],
 	output:
-		report_out = "meta/reference_genomes/{ref_gen}.fai.report"
+		report_out = "data/summaries/reference_genomes/{ref_gen}.fai.report"
 	params:
 		runmem_gb=1,
 		runtime="5:00",
 		cores=1,
 	shell:
 		"""
-		mkdir -p meta/reference_genomes/
+		mkdir -p data/summaries/reference_genomes/
 		cat {input.fai_in} | awk '{{sum+=$2}} END {{ print "number_contigs\t",NR; print "number_bases\t",sum}}' | sed -e 's/^/{wildcards.ref_gen}\t/g' > {output.report_out};
 		"""
 
 rule demand_reference_genome_summary:
 	input:
-		refgen_reports = lambda wildcards: expand("meta/reference_genomes/{ref_gen}.fai.report", ref_gen=ref_genome_by_name.keys())
+		refgen_reports = lambda wildcards: expand("data/summaries/reference_genomes/{ref_gen}.fai.report", ref_gen=ref_genome_by_name.keys())
 	output:
-		refgen_summary = "meta/reference_genomes.summary"
+		refgen_summary = "data/summaries/reference_genomes/reference_genomes.summary"
 	params:
 		runmem_gb=1,
 		runtime="5:00",
@@ -62,64 +80,132 @@ rule demand_reference_genome_summary:
 	shell:
 		"cat {input.refgen_reports} > {output.refgen_summary}"
 
+############################################################################  
+#######		Read files: summon them, process them 	####
+############################################################################  
+
+rule summon_reads_SRA_pe:
+	output:
+		reads1='data/external/sequence/paired_end/{prefix}/{prefix}_1.fastq',
+		reads2='data/external/sequence/paired_end/{prefix}/{prefix}_2.fastq',
+	params:
+		runmem_gb=8,
+		runtime="3:00:00",
+		cores=1,
+	run:
+		try:
+			sra = sampname_by_sra[wildcards.prefix]#["SRA"]
+			shell(""" mkdir -p data/external/sequence/paired_end/{wildcards.prefix}/ """)
+			shell("""
+				fasterq-dump  --split-3 --outdir data/external/sequence/paired_end/{wildcards.prefix}/ {wildcards.prefix}
+			""")
+		except KeyError:
+			raise KeyError("Sorry buddy, you can only download SRAs that are associated with a sample in the config file! " )
+
+rule summon_reads_SRA_se:
+	output:
+		reads='data/external/sequence/single_end/{prefix}/{prefix}.fastq',
+	params:
+		runmem_gb=8,
+		runtime="3:00:00",
+		cores=1,
+	run:
+
+		try:
+			sra = sampname_by_sra[wildcards.prefix]#["SRA"]
+			shell(""" mkdir -p data/external/sequence/single_end/{wildcards.prefix}/ """)
+			# shell("""
+				# fasterq-dump  --split-3 --outdir data/external/sequence/single_end/{wildcards.prefix}/ {sra}
+			# """)
+			shell("""
+				fasterq-dump  --split-3 --outdir data/external/sequence/single_end/{wildcards.prefix}/ {wildcards.prefix}
+			""")
+
+		except KeyError:
+			raise KeyError("Sorry buddy, you can only download SRAs that are associated with a sample in the config file! " )
+
+
+def return_file_relpath_by_sampname(sampname):
+
+
+	if sample_by_name[sampname]["source"] in ["NCBI"]:
+		subfolder = sample_by_name[sampname]["SRA"]
+		path = "data/external/sequence/"
+
+	else:
+		subfolder = sampname
+		path = "data/raw/sequence/"
+
+	if sample_by_name[sampname]["paired"] :
+		path = "%spaired_end/%s/" % (path, subfolder)
+
+	else:
+		path = "%ssingle_end/%s/" % (path,subfolder)
+
+	filesin = return_filename_by_sampname(sampname)
+	pathsout = ["".join([path, fq]) for fq in filesin]
+
+	return pathsout
+
+def return_file_relpath_by_sampname(sampname):
+
+
+	pith = sample_by_name[sampname]["path"]
+
+	filesin = return_filename_by_sampname(sampname)
+	pathsout = ["".join([pith, fq]) for fq in filesin]
+
+	return pathsout
 
 
 rule fastp_clean_sample_se:
 	input:
-		fileIn = lambda wildcards: return_file_relpath_by_sampname(wildcards)
+		fileIn = lambda wildcards: return_file_relpath_by_sampname(wildcards.samplename)
 	output:
-		fileOut = ["{pathprefix}/{samplename}.clean.R0.fastq"],
-		jason = "{pathprefix}/{samplename}.False.json"
+		fileOut = ["data/intermediate/sequence/{samplename}/{samplename}.clean.R0.fastq"],
+#		fileOut = ["{pathprefix}/{samplename}.clean.R0.fastq"],
+		jason = "data/intermediate/sequence/{samplename}/{samplename}.False.json"
 	params:
 		runmem_gb=8,
 		runtime="3:00:00",
 		cores=1,
 		#--trim_front1 and -t, --trim_tail1
 		#--trim_front2 and -T, --trim_tail2. 
-		common_params = "--json {pathprefix}/{samplename}.False.json",# --html meta/FASTP/{samplename}.html", 
+		common_params = "--json data/intermediate/sequence/{samplename}/{samplename}.False.json --n_base_limit 0 ",# --html meta/FASTP/{samplename}.html", 
 		se_params = "",
 	message:
 		"FASTP QA/QC on single-ended reads ({wildcards.samplename}) in progress.... "
-	shell:
-		"/nas/longleaf/home/csoeder/modules/fastp/fastp {params.common_params} {params.se_params} --in1 {input.fileIn[0]} --out1 {output.fileOut[0]}"
-
-
+	run:
+		shell(""" mkdir -p data/intermediate/sequence/{wildcards.samplename}/ """)
+		shell(""" /nas/longleaf/home/csoeder/modules/fastp/fastp {params.common_params} {params.se_params} --in1 {input.fileIn[0]} --out1 {output.fileOut[0]} """)
+		
 rule fastp_clean_sample_pe:
 	input:
-		fileIn = lambda wildcards: return_file_relpath_by_sampname(wildcards)
+		fileIn = lambda wildcards: return_file_relpath_by_sampname(wildcards.samplename)
 	output:
-		fileOut = ["{pathprefix}/{samplename}.clean.R1.fastq","{pathprefix}/{samplename}.clean.R2.fastq"],
-		jason = "{pathprefix}/{samplename}.True.json"
+		fileOut = ["data/intermediate/sequence/{samplename}/{samplename}.clean.R1.fastq","data/intermediate/sequence/{samplename}/{samplename}.clean.R2.fastq"],
+		jason = "data/intermediate/sequence/{samplename}/{samplename}.True.json"
 	params:
 		runmem_gb=8,
 		runtime="3:00:00",
 		cores=1,
 		#--trim_front1 and -t, --trim_tail1
 		#--trim_front2 and -T, --trim_tail2. 
-		common_params = "--json {pathprefix}/{samplename}.True.json",# --html meta/FASTP/{samplename}.html", 
+		common_params = "--json data/intermediate/sequence/{samplename}/{samplename}.True.json --n_base_limit 0 ",# --html meta/FASTP/{samplename}.html", 
 		pe_params = "--detect_adapter_for_pe --correction",
 	message:
 		"FASTP QA/QC on paired-ended reads ({wildcards.samplename}) in progress.... "
-	shell:
-		"/nas/longleaf/home/csoeder/modules/fastp/fastp {params.common_params} {params.pe_params} --in1 {input.fileIn[0]} --out1 {output.fileOut[0]} --in2 {input.fileIn[1]} --out2 {output.fileOut[1]}"
+	run:
+		shell(""" mkdir -p data/intermediate/sequence/{wildcards.samplename}/ """)
+		shell(""" /nas/longleaf/home/csoeder/modules/fastp/fastp {params.common_params} {params.pe_params} --in1 {input.fileIn[0]} --out1 {output.fileOut[0]} --in2 {input.fileIn[1]} --out2 {output.fileOut[1]} """)
 
-#request FASTP reportBacks instead, process them into a unified SQL upload?
-# rule clean_all_samps:
-# 	input: 
-# 		clean_se = [sample_by_name[nom]['path']+nom+".clean.R0.fastq" for nom in sample_by_name.keys() if not sample_by_name[nom]['paired']],
-# 		clean_pe = [sample_by_name[nom]['path']+nom+".clean.R"+arr+".fastq" for nom in sample_by_name.keys() if sample_by_name[nom]['paired'] for arr in ["1","2"]],
-# 	output:
-# 		outflg = "allclean.flag"
-# 	shell:
-# 		"touch {output.outflg}"
-
-#lambda wildcards: return_file_relpath_by_sampname(wildcards)
 
 rule FASTP_summarizer:
 	input: 
-		jason = lambda wildcards: expand("{path}{samp}.{pairt}.json", path=sample_by_name[wildcards.samplename]['path'], samp = wildcards.samplename, pairt = sample_by_name[wildcards.samplename]['paired'])
+		jason = lambda wildcards: expand("data/intermediate/sequence/{samp}/{samp}.{pairt}.json", samp = wildcards.samplename, pairt = sample_by_name[wildcards.samplename]['paired'])
+#		jason = lambda wildcards: expand("{path}{samp}.{pairt}.json", path=sample_by_name[wildcards.samplename]['path'], samp = wildcards.samplename, pairt = sample_by_name[wildcards.samplename]['paired'])
 	output:
-		jason_pruned = "meta/FASTP/{samplename}.json.pruned"
+		jason_pruned = "data/summaries/intermediate/FASTP/{samplename}/{samplename}.json.pruned"
 	params:
 		runmem_gb=1,
 		runtime="5:00",
@@ -128,15 +214,16 @@ rule FASTP_summarizer:
 		"Summarizing reads for sample ({wildcards.samplename}) .... "	
 	shell:
 		"""
-		cp {input.jason} meta/FASTP/{wildcards.samplename}.json
+		mkdir -p data/summaries/intermediate/FASTP/{wildcards.samplename}/
+		cp {input.jason} data/summaries/intermediate/FASTP/{wildcards.samplename}/{wildcards.samplename}.json
 		python3 scripts/fastp_reporter.py {input.jason} {output.jason_pruned} -t {wildcards.samplename}
 		"""
 
 rule demand_FASTQ_analytics:	#forces a FASTP clean
 	input:
-		jasons_in = expand("meta/FASTP/{samplename}.json.pruned", samplename = sample_by_name.keys())
+		jasons_in = lambda wildcards: expand("data/summaries/intermediate/FASTP/{samplename}/{samplename}.json.pruned", samplename = sampname_by_group[wildcards.group])
 	output:
-		summary = "meta/sequenced_reads.dat"
+		summary = "data/summaries/intermediate/FASTP/{group}.sequenced_reads.dat"
 	params:
 		runmem_gb=1,
 		runtime="1:00",
@@ -147,41 +234,44 @@ rule demand_FASTQ_analytics:	#forces a FASTP clean
 		"cat {input.jasons_in} > {output.summary}"
 
 
-#	request stats/idxstats/flagstats?  
+
+############################################################################  
+#######		Map reads to reference genomes 	####
+############################################################################  
+
+
 rule bwa_align:
 	input:
-		reads_in = lambda wildcards: expand("{path}{sample}.clean.R{arr}.fastq", path=sample_by_name[wildcards.sample]['path'], sample=wildcards.sample, arr=[ [1,2] if sample_by_name[wildcards.sample]['paired'] else [0] ][0]),
+#		reads_in = lambda wildcards: expand("data/intermediate/FASTQs/{source}/{sample}/{sample}.clean.R{arr}.fastq", source=sample_by_name[wildcards.sample]['source'], sample=wildcards.sample, arr=[ [1,2] if sample_by_name[wildcards.sample]['paired'] else [0] ][0]),
+		reads_in = lambda wildcards: expand("data/intermediate/sequence/{sample}/{sample}.clean.R{arr}.fastq", sample=wildcards.sample, arr=[ [1,2] if sample_by_name[wildcards.sample]['paired'] else [0] ][0]),
 		ref_genome_file = lambda wildcards: ref_genome_by_name[wildcards.ref_genome]['path'],
 	output:
-		bam_out = "mapped_reads/{sample}.vs_{ref_genome}.bwa.sort.bam",
+		bam_out = "data/intermediate/mapped_reads/bwa/{sample}.vs_{ref_genome}.bwa.sort.bam",
 	params:
-		runmem_gb=64,
+		runmem_gb=96,
 		runtime="64:00:00",
 		cores=8,
 	message:
 		"aligning reads from {wildcards.sample} to reference_genome {wildcards.ref_genome} .... "
 	run:
-		shell("bwa aln {input.ref_genome_file} {input.reads_in[0]} > {input.reads_in[0]}.sai ")
+		shell("bwa aln {input.ref_genome_file} {input.reads_in[0]} > {input.reads_in[0]}.{wildcards.ref_genome}.sai ")
 		if sample_by_name[wildcards.sample]['paired']:
-			shell("bwa aln {input.ref_genome_file} {input.reads_in[1]} > {input.reads_in[1]}.sai ")
-			shell("bwa sampe {input.ref_genome_file} {input.reads_in[0]}.sai {input.reads_in[1]}.sai {input.reads_in[0]}  {input.reads_in[1]} | samtools view -Shb | samtools addreplacerg -r ID:{wildcards.sample} -r SM:{wildcards.sample} - | samtools sort -o {output.bam_out} - ")
+			shell("bwa aln {input.ref_genome_file} {input.reads_in[1]} > {input.reads_in[1]}.{wildcards.ref_genome}.sai ")
+			shell("bwa sampe {input.ref_genome_file} {input.reads_in[0]}.{wildcards.ref_genome}.sai {input.reads_in[1]}.{wildcards.ref_genome}.sai {input.reads_in[0]}  {input.reads_in[1]} | samtools view -Shb | samtools addreplacerg -r ID:{wildcards.sample} -r SM:{wildcards.sample} - | samtools sort -o {output.bam_out} - ")
 		else:
-			shell("bwa samse {input.ref_genome_file} {input.reads_in[0]}.sai {input.reads_in[0]} | samtools view -Shb | samtools addreplacerg -r ID:{wildcards.sample} -r SM:{wildcards.sample} - | samtools sort -o {output.bam_out} - ")
+			shell("bwa samse {input.ref_genome_file} {input.reads_in[0]}.{wildcards.ref_genome}.sai {input.reads_in[0]} | samtools view -Shb | samtools addreplacerg -r ID:{wildcards.sample} -r SM:{wildcards.sample} - | samtools sort -o {output.bam_out} - ")
 		shell("samtools index {output.bam_out}")
-
-
-#	request stats/idxstats/flagstats?  
 
 rule bwa_uniq:
 	input:
-		bam_in = "mapped_reads/{sample}.vs_{ref_genome}.bwa.sort.bam"
+		bam_in = "data/intermediate/mapped_reads/bwa/{sample}.vs_{ref_genome}.bwa.sort.bam"
 	output:
-		bam_out = "mapped_reads/{sample}.vs_{ref_genome}.bwaUniq.sort.bam"
+		bam_out = "data/intermediate/mapped_reads/bwaUniq/{sample}.vs_{ref_genome}.bwaUniq.sort.bam"
 	params:
 		quality="-q 20 -F 0x0100 -F 0x0200 -F 0x0300 -F 0x04",
 		uniqueness="XT:A:U.*X0:i:1.*X1:i:0",
 		runmem_gb=16,
-		runtime="6:00:00",
+		runtime="18:00:00",
 		cores=4,
 	message:
 		"filtering alignment of {wildcards.sample} to {wildcards.ref_genome} for quality and mapping uniqueness.... "	
@@ -192,13 +282,11 @@ rule bwa_uniq:
 		shell("samtools view {params.quality} {input.bam_in} | grep -E {params.uniqueness} | samtools view -bS -T {ref_genome_file} - | samtools addreplacerg -r ID:{wildcards.sample} -r SM:{wildcards.sample} - | samtools sort -n - | samtools fixmate -m - - | samtools sort - | samtools markdup -r - {output.bam_out}")
 		shell("samtools index {output.bam_out}")
 
-
-
 rule bam_reporter:
 	input:
-		bam_in = "mapped_reads/{sample}.vs_{ref_genome}.{aligner}.sort.bam"
+		bam_in = "data/intermediate/mapped_reads/{aligner}/{sample}.vs_{ref_genome}.{aligner}.sort.bam"
 	output:
-		report_out = "meta/BAMs/{sample}.vs_{ref_genome}.{aligner}.summary"
+		report_out = "data/summaries/intermediate/BAMs/{aligner}/{sample}.vs_{ref_genome}.{aligner}.summary"
 	params:
 		runmem_gb=8,
 		runtime="4:00:00",
@@ -206,6 +294,7 @@ rule bam_reporter:
 	message:
 		"Collecting metadata for the {wildcards.aligner} alignment of {wildcards.sample} to {wildcards.ref_genome}.... "
 	run:
+		shell(""" mkdir -p data/summaries/intermediate/BAMs/{wildcards.aligner}/ """)
 		ref_genome_idx=ref_genome_by_name[wildcards.ref_genome]['fai']
 		shell("samtools idxstats {input.bam_in} > {input.bam_in}.idxstats")
 		shell("samtools flagstat {input.bam_in} > {input.bam_in}.flagstat")
@@ -216,12 +305,12 @@ rule bam_reporter:
 		#save the depth file and offload the statistics to the bam_summarizer script?? 
 		shell("python3 scripts/bam_summarizer.py -f {input.bam_in}.flagstat -i {input.bam_in}.idxstats -g {input.bam_in}.genomcov -d {input.bam_in}.dpthStats -o {output.report_out} -t {wildcards.sample}")
 
-
 rule demand_BAM_analytics:
 	input:
-		bam_reports = lambda wildcards: expand("meta/BAMs/{sample}.vs_{ref_genome}.{aligner}.summary", sample=sample_by_name.keys(), ref_genome=wildcards.ref_genome, aligner=wildcards.aligner)
+		bam_reports = lambda wildcards: expand("data/summaries/intermediate/BAMs/{aligner}/{sample}.vs_{ref_genome}.{aligner}.summary", sample=sampname_by_group[wildcards.group], ref_genome=wildcards.ref_genome, aligner=wildcards.aligner)
 	output:
-		full_report = "meta/alignments.vs_{ref_genome}.{aligner}.summary"
+#		full_report = "data/summaries/intermediate/BAMs/{group}.vs_{ref_genome}.{aligner}.summary"
+		full_report = "data/summaries/intermediate/BAMs/{group, \w+}.vs_{ref_genome}.{aligner}.summary"
 	params:
 		runmem_gb=1,
 		runtime="1:00",
@@ -230,56 +319,38 @@ rule demand_BAM_analytics:
 		"collecting all alignment metadata.... "
 	shell:
 		"cat {input.bam_reports} > {output.full_report}"
-#	cat test.samtools.idxstats | sed \$d | awk '{print $1, $3/$2}' > per_contig_coverage_depth
-#	echo  $( cat test.samtools.idxstats |  sed \$d | cut -f 2 | paste -sd+ | bc) $(cat test.samtools.idxstats |  sed \$d | cut -f 3 | paste -sd+ | bc) | tr  " " "\t" | awk '{print "total\t"$1/$2}'
 
 
-# rule joint_vcf_caller:
-# 	input:
-# 		bams_in = lambda wildcards: expand("mapped_reads/{sample}.vs_{ref_genome}.{aligner}.sort.bam", sample=sample_by_name.keys(), ref_genome=wildcards.ref_genome, aligner=wildcards.aligner),
-# 	output:
-# 		vcf_out = "variants/all_samples.vs_{ref_genome}.{aligner}.vcf"
-# 	params:
-# 		freebayes="--standard-filters",
-# 		runmem_gb=32,
-# 		runtime="96:00:00",
-# 	message:
-# 		"Jointly calling variants from all samples mapped to \ {wildcards.ref_genome} \ with \ {wildcards.aligner} \ "
-# 	run:
-# 		ref_genome_file=ref_genome_by_name[wildcards.ref_genome]['path']
-# 		shell("freebayes {params.freebayes} -f {ref_genome_file} {input.bams_in} | vcftools --remove-indels --vcf - --recode --recode-INFO-all --stdout  > {output.vcf_out}")
-
-
-## VCF summary report? eg, shared fraction of genome covered by x% of samples at mindepth?
+############################################################################  
+#######		Call variants from mapped reads 	####
+############################################################################  
 
 
 rule joint_vcf_caller_parallel:
 	input:
-		bams_in = lambda wildcards: expand("mapped_reads/{sample}.vs_{ref_genome}.{aligner}.sort.bam", sample=sample_by_name.keys(), ref_genome=wildcards.ref_genome, aligner=wildcards.aligner),
-		windows_in = "utils/{ref_genome}_w100000_s100000.windows.bed"
+		bams_in = lambda wildcards: expand("data/intermediate/mapped_reads/{aligner}/{sample}.vs_{ref_genome}.{aligner}.sort.bam", sample=sampname_by_group[wildcards.group], ref_genome=wildcards.ref_genome, aligner=wildcards.aligner),
+		windows_in = "utils/genome_windows/{ref_genome}_w100000_s100000.windows.bed"
 	output:
-		vcf_out = "variants/all_samples.vs_{ref_genome}.{aligner}.vcf"
+		vcf_out = "data/intermediate/variants/freebayes/{group}.vs_{ref_genome}.{aligner}.vcf"
 	params:
 		freebayes="--standard-filters",
-		runmem_gb=32,
-		runtime="96:00:00",
+		runmem_gb=64,
+		runtime="10-00:00:00",
 		cores=24,
 	message:
-		"Jointly calling variants from all samples mapped to \ {wildcards.ref_genome} \ with \ {wildcards.aligner} \ "
+		"Using Freebayes to jointly call variants from all samples mapped to \ {wildcards.ref_genome} \ with \ {wildcards.aligner} \ "
 	run:
 		ref_genome_file=ref_genome_by_name[wildcards.ref_genome]['path']
 		shell("""cat {input.windows_in}| awk '{{print$1":"$2"-"$3}}' > {input.windows_in}.rfmt""")
 		shell("scripts/freebayes-parallel {input.windows_in}.rfmt {params.cores} {params.freebayes} -f {ref_genome_file} {input.bams_in} | vcftools --remove-indels --vcf - --recode --recode-INFO-all --stdout  > {output.vcf_out} ")
-		#shell("~/modules/freebayes/scripts/freebayes-parallel {input.windows_in}.rfmt {params.cores}  --standard-filters -f {ref_genome_file} {input.bams_in} | vcftools --remove-indels --vcf - --recode --recode-INFO-all --stdout  > {output.vcf_out} ")
-		#shell("freebayes {params.freebayes} -f {ref_genome_file} {input.bams_in} | vcftools --remove-indels --vcf - --recode --recode-INFO-all --stdout  > {output.vcf_out}")
 
 
-rule vcf_reporter:
+rule vcf_reporter: # replace this with the better reporter for freebayesSmrt?
 	input:
-		vcf_in = "variants/{prefix}.vs_{ref_genome}.{aligner}.vcf"
+		vcf_in = "data/intermediate/variants/{prefix}.vs_{ref_genome}.{aligner}.vcf"
 	output:
-		report_out = "meta/VCFs/{prefix}.vs_{ref_genome}.{aligner}.summary",
-		frq_out = "meta/VCFs/{prefix}.vs_{ref_genome}.{aligner}.summary.frq"
+		report_out = "data/summaries/intermediate/VCFs/{ref_genome}/{prefix}.vs_{ref_genome}.{aligner}.summary",
+		frq_out = "data/intermediate/frequencies/{prefix}.vs_{ref_genome}.{aligner}.frq"
 	params:
 		runmem_gb=8,
 		runtime="4:00:00",
@@ -288,6 +359,7 @@ rule vcf_reporter:
 #		"Collecting metadata for the {wildcards.aligner} alignment of {wildcards.sample} to {wildcards.ref_genome}.... "
 	shell:
 		"""
+		mkdir -p data/intermediate/frequencies/ data/summaries/intermediate/VCFs/{wildcards.ref_genome}/
 		cat {input.vcf_in}  | grep -v "#" | cut -f 1 | sort | uniq -c > {output.report_out}.snpsPerContig.tmp
 		cat {output.report_out}.snpsPerContig.tmp | awk '{{sum+=$1}} END {{ print sum,"\ttotal"}}' | cat {output.report_out}.snpsPerContig.tmp - > {output.report_out}.snpsPerContig
 		rm {output.report_out}.snpsPerContig.tmp
@@ -297,19 +369,19 @@ rule vcf_reporter:
 		vcftools  --vcf {input.vcf_in} --out {output.report_out} --missing-site
 		vcftools  --vcf {input.vcf_in} --out {output.report_out} --singletons
 
+		cat {output.report_out}.frq | tail -n +2 | awk '{{print $1,$2,$2+1,$4,$5,$6}}' | tr " " "\t" > {output.frq_out}
+
 		ref_genome={wildcards.ref_genome}
 
 		tail -n 1 {output.report_out}.snpsPerContig | awk '{{print "total_snp_count\t"$1}}' | sed -e 's/^/'$ref_genome'\t/g' > {output.report_out}
 		"""
-	#cat  all_samples.vs_droSec1.bwaUniq.summary.frq.count| cut -f 3 | tail -n +2 | sort | uniq -c
-	#####	bi, tri, and quadralelic counts ^^ 
-	#replace some of this with vcftools::vcf-stats ?
+
 
 rule summon_VCF_analytics_base:
 	input:
-		bam_reports = lambda wildcards: expand("meta/VCFs/{prefix}.vs_{ref_genome}.{aligner}.summary", prefix=wildcards.prefix, ref_genome=["droSim1","droSec1"], aligner="bwaUniq")
+		bam_reports = lambda wildcards: expand("data/summaries/intermediate/VCFs/{ref_genome}/{caller}/{prefix}.vs_{ref_genome}.{aligner}.summary", prefix=wildcards.prefix, ref_genome=["dm6","droSim1","irvineSec"], aligner="bwaUniq")
 	output:
-		full_report = "meta/{prefix}.calledVariants.{aligner}.summary"
+		full_report = "data/summaries/intermediate/VCFs/{caller}/{prefix}.calledVariants.{aligner}.summary"
 	params:
 		runmem_gb=1,
 		runtime="1:00",
@@ -322,15 +394,12 @@ rule summon_VCF_analytics_base:
 		cat {input.bam_reports} | sed -e 's/^/'$prefix'\t/g'> {output.full_report}
 		"""
 
-## benchmarking??
-#	https://snakemake.readthedocs.io/en/stable/snakefiles/rules.html#benchmark-rules
 
-
-rule subset_VCF_to_subgroup:
+rule subset_VCF_to_subgroup: # does this work with freebayesSmrt?
 	input:
-		vcf_in = "variants/{prefix}.vs_{ref_genome}.{aligner}.vcf"
+		vcf_in = "data/intermediate/variants/{caller}/{group}.vs_{ref_genome}.{aligner}.vcf"
 	output:
-		vcf_out = "variants/{prefix}.subset_{subgroup}.vs_{ref_genome}.{aligner}.vcf"
+		vcf_out = "data/intermediate/variants/{caller}/{group}.subset_{subgroup}.vs_{ref_genome}.{aligner}.vcf"
 	params:
 		runmem_gb=8,
 		runtime = "1:00:00",
@@ -338,201 +407,164 @@ rule subset_VCF_to_subgroup:
 	message:
 		"Subsetting the variant file \ {input.vcf_in} \ to the individuals in the subgroup \ {wildcards.subgroup} \ .... "
 	run:
+#		filter_string = "--min-alleles 2 --max-alleles 2  --max-missing-count 0 " #--non-ref-ac-any 1" # only biallelic sites, no missing genotypes, no invariant sites.
+#		member_list = "%s,"*len(sampname_by_group[wildcards.subgroup]) % tuple(sampname_by_group[wildcards.subgroup])
+#		shell("vcf-subset {input.vcf_in} -u -c {member_list} | vcftools {filter_string} --vcf - --recode --stdout > {output.vcf_out}")
+
 		member_list = "%s,"*len(sampname_by_group[wildcards.subgroup]) % tuple(sampname_by_group[wildcards.subgroup])
-		shell("vcf-subset {input.vcf_in} -u -c {member_list} | vcftools --min-alleles 2 --max-alleles 2  --max-missing-count 1  --vcf - --recode --stdout > {output.vcf_out}")
+		filter_string = " --min-alleles 2 --max-alleles 2 --types snps --exclude 'F_MISSING>0' "
+		shell("vcf-subset {input.vcf_in} -u -c {member_list} | bcftools +fill-tags -  -- -t AF,AC,F_MISSING,NS,AN | bcftools view {filter_string}  > {output.vcf_out}")
+
+
+
 
 
 
 rule window_maker:
 	output:
-		windowed='utils/{ref_genome}_w{window_size}_s{slide_rate}.windows.bed'
+		windowed='utils/genome_windows/{ref_genome}_w{window_size}_s{slide_rate}.windows.bed'
 	params:
 		runmem_gb=8,
 		runtime="5:00",
 		cores=1,
 	run:
 		fai_path = ref_genome_by_name[wildcards.ref_genome]['fai'],
-		shell("mkdir -p utils")
+		shell("mkdir -p utils/genome_windows/")
 		shell(
 			'bedtools makewindows -w {wildcards.window_size} -s {wildcards.slide_rate} -g {fai_path} -i winnum | bedtools sort -i - > {output.windowed}'
 		)
 
 
-
-#######		windowed frequency comparison between groups 	#######################
-
-rule clean_groupFreqs:
-	input:
-		#vcf_in = "variants/{prefix}.subset_{grup}.vs_{ref_genome}.{aligner}.vcf",
-		frq_in = "meta/VCFs/{prefix}.subset_{grup}.vs_{ref_genome}.{aligner}.summary.frq"
-	output:
-		frq_out = "variant_analysis/freqs/{prefix}.subset_{grup}.vs_{ref_genome}.{aligner}.frq",
-	params:
-		runmem_gb=16,
-		runtime="15:00",
-		cores=2,
-	shell:
-		"""
-		mkdir -p variant_analysis/freqs/
-		tail -n +2 {input.frq_in}  | awk '{{print $1,$2,$2+1,$4,$5,$6}}' | tr " " "\t" > {output.frq_out}
-		"""
-
+############################################################################  
+#######		windowed frequency comparison between groups 	################
+############################################################################  
 
 rule calc_frq_shift:
 	input:
-		par1_frq = "variant_analysis/freqs/{prefix}.subset_{grup_par1}.vs_{ref_genome}.{aligner}.frq",
-		par2_frq = "variant_analysis/freqs/{prefix}.subset_{grup_par2}.vs_{ref_genome}.{aligner}.frq",
-		off_frq = "variant_analysis/freqs/{prefix}.subset_{grup_off}.vs_{ref_genome}.{aligner}.frq",
+		par1_frq = "data/intermediate/frequencies/{prefix}.subset_{grup_par1}.vs_{ref_genome}.{aligner}.frq",
+		par2_frq = "data/intermediate/frequencies/{prefix}.subset_{grup_par2}.vs_{ref_genome}.{aligner}.frq",
+		off_frq = "data/intermediate/frequencies/{prefix}.subset_{grup_off}.vs_{ref_genome}.{aligner}.frq",
 	output:
-		frqShft_out = "variant_analysis/freqShift/{prefix}.{grup_off}_with_{grup_par1}_and_{grup_par2}.vs_{ref_genome}.{aligner}.frqShift"
+		frqShft_out = "data/intermediate/freq_shift/{prefix}.{grup_off}_with_{grup_par1}_and_{grup_par2}.vs_{ref_genome}.{aligner}.frqShift"
 	params:
 		runmem_gb=16,
 		runtime="1:00:00",
 		cores=2,
 	shell:
 		"""
-		mkdir -p variant_analysis/freqShift/
+		mkdir -p data/intermediate/freq_shift/
 		bedtools intersect -wa -wb -a {input.par1_frq} -b  {input.par2_frq} | bedtools intersect -wa -wb -a - -b  {input.off_frq} | cut -f 1,2,4-6,10,12,16,18 | tr ":" "\t" | awk '{{print $1,$2,$2+1,"0","0","+",$4,$6,$3,$7,$8,$10,$11,$13}}' | tr " " "\t" > {output.frqShft_out}.pre
 		Rscript scripts/freqShifter.R {output.frqShft_out}.pre {output.frqShft_out}
 		rm {output.frqShft_out}.pre
 		"""
 
-#	no need for biallelic check - that's done in the subsetting
-#	add a check to make sure that it's the same allele in each case, write down the cases which aren't????
 
-rule window_frq_shift:
+
+rule window_frq_shift: #generalized windows? eg from moehring paper
 	input:
-		frqShft_in = "variant_analysis/freqShift/{frqshft_prefix}.vs_{ref_genome}.{aligner}.frqShift",
-		windows_in = "utils/{ref_genome}_w{window_size}_s{slide_rate}.windows.bed"
+		frqShft_in = "data/intermediate/freq_shift/{frqshft_prefix}.vs_{ref_genome}.{aligner}.frqShift",
+		windows_in = "utils/genome_windows/{ref_genome}_w{window_size}_s{slide_rate}.windows.bed"
 	output:
-		windowed_out = "variant_analysis/freqShift/{frqshft_prefix}.vs_{ref_genome}.{aligner}.windowed_w{window_size}_s{slide_rate}.frqShift"
+		windowed_out = "data/ultimate/freq_shift/{frqshft_prefix}.vs_{ref_genome,[^.]+}.{aligner}.windowed_w{window_size}_s{slide_rate}.frqShift.bed"
 	params:
 		runmem_gb=16,
-		runtime="1:00:00",
+		runtime="10:00",
 		cores=4,
 	shell:
 		"""
-		bedtools map -c 7,8,8 -o sum,sum,count -null NA -a {input.windows_in} -b <( tail -n +2  {input.frqShft_in} | cut -f  1-3,15,16 | nl | tr -d " " | awk '{{print $2,$3,$4,$1,"0",".",$5,$6}}' | tr " " "\t"| bedtools sort -i - ) > {output.windowed_out}
+		mkdir -p data/ultimate/freq_shift/
+		bedtools map -c 7,8,8 -o sum,sum,count -null NA -a {input.windows_in} -b <( tail -n +2  {input.frqShft_in} | cut -f  1-3,15,16 | nl | tr -d " " | awk '{{if( $5!="NA" && $6!="NA")print $2,$3,$4,$1,"0",".",$5,$6}}' | tr " " "\t"| bedtools sort -i - ) > {output.windowed_out}
   		"""
 
-
-#cat utils/droSim1_w100000_s100000.windows.bed | grep -w "chr2L" > dev/droSim1_w100000_s100000.windows.chr2L.bed  
-
-#vcftools  --vcf PopSech.chr2L.vs_droSim1.bwaUniq.vcf --stdout --freq 
-#vcftools  --vcf PopSim.chr2L.vs_droSim1.bwaUniq.vcf --out PopSim.chr2L.vs_droSim1.bwaUniq --freq 
-#vcftools  --vcf selection.chr2L.vs_droSim1.bwaUniq.vcf --out selection.chr2L.vs_droSim1.bwaUniq --freq 
-
-
-#bedtools intersect -wa -wb -a <(cat PopSech.chr2L.vs_droSim1.bwaUniq.frq | tail -n +2 | awk '{print $1,$2,$2+1,$4,$5,$6}' | tr " " "\t") -b <(cat PopSim.chr2L.vs_droSim1.bwaUniq.frq | tail -n +2 | awk '{print $1,$2,$2+1,$4,$5,$6}' | tr " " "\t") | bedtools intersect -wa -wb -a - -b <(cat selection.chr2L.vs_droSim1.bwaUniq.frq | tail -n +2 | awk '{print $1,$2,$2+1,$4,$5,$6}' | tr " " "\t") | cut -f 1,2,4-6,10,12,16,18 | tr ":" "\t" | awk '{print $1,$2,$2+1,"0","0","+",$4,$6,$3,$7,$8,$10,$11,$13}' | tr " " "\t" > dev/grouped_freaks2.bed
-
-
-#*.bwaUniq.frq ---> grouped_freaks2
-
-#( dev/grouped_freaks2.bed --> R script --> chr2L.freqCompare.bed)
-
-#cat chr2L.freqCompare.bed | cut -f 1,2,3,6,18,19 | nl | tr -d " " | awk '{print $2,$3,$4,$1,"0",".",$6,$7}' | tr " " "\t" > chr2L.freqCompare.clean.bed 
-
-#bedtools map -c 7,8,8 -o sum,sum,count -null NA -a dev/droSim1_w100000_s100000.windows.chr2L.bed -b chr2L.freqCompare.clean.bed > dev/chr2L.freqCompare.windowed.bed
-
-############################################################################  
-
-
-
-
-#######		Calculating VCF-based distance metric by windowed 	####
-
-rule pairwise_VCF_distance_metric_windowed:
+rule bin_frqShft:
 	input:
-		vcf_in="variants/{prefix}.vs_{ref_genome}.{aligner}.vcf",
-		windoze_in = "utils/{window_prefix}.windows.bed" #generalize this
+		shared_snps='data/intermediate/freq_shift/{var_caller}/{frqshft_prefix}.frqShift',
 	output:
-		pairdist_out = ["variants/{prefix}.vs_{ref_genome}.{aligner}/distances/{indiv_1}/{indiv_2}.{window_prefix}.bed","variants/{prefix}.vs_{ref_genome}.{aligner}/distances/{indiv_2}/{indiv_1}.{window_prefix}.bed"]
-	params:
-		runmem_gb=16,
-		runtime = "4:00:00",
-		cores=2,
-	run:
-		shell(
-			"""
-			mkdir -p variants/{wildcards.prefix}.vs_{wildcards.ref_genome}.{wildcards.aligner}/distances/{wildcards.indiv_1}/
-			bedtools map -a {input.windoze_in} -b <(vcf-subset {input.vcf_in} -u -c {wildcards.indiv_1},{wildcards.indiv_2} | grep -v "#" | sed -e 's/0\/0:\S*\(\s\|$\)/0\t/g'  | sed -e 's/0\/1:\S*\(\s\|$\)/1\t/g' | sed -e 's/1\/0:\S*\(\s\|$\)/1\t/g' | sed -e 's/1\/1:\S*\(\s\|$\)/2\t/g' | sed -e 's/\.:\S*\(\s\|$\)/NA\t/g' |awk '{{print $1,$2,$2+1,0,0,"*",$10,$11,sqrt(($10-$11)^2)}}' | tr " " "\t" | grep -v NA | bedtools sort -i - ) -c 9,9 -o sum,count | awk '{{if($6>0)print $1,$2,$3,$4,$5/(2*$6) ;else print $1,$2,$3,$4,"NA"}}' | tr " " "\t" > {output.pairdist_out[0]}
-			"""
-			)
-		if len(set(output.pairdist_out)) > 1:
-			shell(
-				"""
-				mkdir -p variants/{wildcards.prefix}.vs_{wildcards.ref_genome}.{wildcards.aligner}/distances/{wildcards.indiv_2}/
-				cp {output.pairdist_out[0]} {output.pairdist_out[1]}
-				"""
-				)
-# 			hmm..... maybe wrap that one-liner up in a different script?
-#all_samples.chr2L.vs_droSim1.bwaUniq.vcf
-
-rule all_dist_to_indiv_by_group:
-	input:
-		groupies = lambda wildcards: expand("variants/{prefix}.vs_{ref_genome}.{aligner}/distances/{indiv}/{groupie}.{window_prefix}.bed", prefix=wildcards.prefix, ref_genome=wildcards.ref_genome, aligner=wildcards.aligner, indiv=wildcards.indiv, groupie=sampname_by_group[wildcards.group], window_prefix=wildcards.window_prefix),
-	output:
-		group_dist = "variants/{prefix}.vs_{ref_genome}.{aligner}/distances/{indiv}/{group}.{window_prefix}.tbl"
-	params:
-		runmem_gb=8,
-		runtime = "10:00",
-		cores=2,
-	run:
-		shell("touch {output.group_dist}.tmp")
-
-		for groupie in sampname_by_group[wildcards.group]:
-			shell("""cat variants/{wildcards.prefix}.vs_{wildcards.ref_genome}.{wildcards.aligner}/distances/{wildcards.indiv}/{groupie}.{wildcards.window_prefix}.bed | cut -f 5 | cat <(echo {groupie}) - | paste {output.group_dist}.tmp - > {output.group_dist} 
-					cp {output.group_dist} {output.group_dist}.tmp
-					""")
-		shell("""cat <(echo "chr\tstart\tstop\twin") variants/{wildcards.prefix}.vs_{wildcards.ref_genome}.{wildcards.aligner}/distances/{wildcards.indiv}/{groupie}.{wildcards.window_prefix}.bed | cut -f 1-4 | paste - {output.group_dist}.tmp > {output.group_dist}""")
-		shell("rm {output.group_dist}.tmp")
-
-rule group2group_VCF_distance:
-	input:
-		tables_in = lambda wildcards: expand("variants/{prefix}.vs_{ref_genome}.{aligner}/distances/{indiv}/{group2}.{window_prefix}.tbl", prefix=wildcards.prefix, ref_genome=wildcards.ref_genome, aligner=wildcards.aligner, group2=wildcards.group2, indiv=sampname_by_group[wildcards.group1], window_prefix=wildcards.window_prefix)
-	output:
-		roster_out = "variants/{prefix}.vs_{ref_genome}.{aligner}/distances/from.{group1}.to.{group2}.{window_prefix}.distanceRoster"
-	params:
-		runmem_gb=1,
-		runtime = "1:00",
-		cores=1,
-	shell:
-		"""echo {input.tables_in} | tr " " "\n" > {output.roster_out}"""
-
-############################################################
-
-
-
-
-rule write_report:
-	input:
-		reference_genome_summary = ["meta/reference_genomes.summary"],
-		sequenced_reads_summary=["meta/sequenced_reads.dat"],
-		alignment_summaries = expand("meta/alignments.vs_{ref_genome}.{aligner}.summary", ref_genome=['droSim1', 'droSec1'], aligner=['bwa','bwaUniq']),
-		full_variant_summary = expand("meta/{prefix}.calledVariants.{aligner}.summary", aligner=["bwaUniq"], prefix=["all_samples"] ),
-		windowed_frq_shifts = expand("variant_analysis/freqShift/all_samples.{treat}_with_PopSec_and_PopSim.vs_droSim1.bwaUniq.windowed_w100000_s100000.frqShift", treat = ['selection','control']),
-		distances = expand("variants/all_samples.vs_{ref_genome}.bwaUniq/distances/from.all.to.all.{ref_genome}_w100000_s100000.distanceRoster",ref_genome=['droSim1', 'droSec1']),
-	output:
-		pdf_out="thingy.pdf"
+		windowed_out = "data/ultimate/freq_shift/{var_caller}/{frqshft_prefix}.snpBinned_b{bin_size}_s{slide_rate}.frqShift.bed"
 	params:
 		runmem_gb=8,
 		runtime="1:00:00",
-		cores=2,
-	message:
-		"writing up the results.... "
+		cores=8,
 	run:
-		pandoc_path="/nas/longleaf/apps/rstudio/1.0.136/bin/pandoc"
-		pwd = subprocess.check_output("pwd",shell=True).decode().rstrip()+"/"
-		shell(""" R -e "setwd('{pwd}');Sys.setenv(RSTUDIO_PANDOC='{pandoc_path}')" -e  "peaDubDee='{pwd}'; rmarkdown::render('scripts/PopPsiSeq_summary.Rmd',output_file='{pwd}{output.pdf_out}')"  """)
-#		shell(""" R -e "setwd('{pwd}/');" -e Sys.setenv"(RSTUDIO_PANDOC='{pandoc_path}')" -e  rmarkdown::render"('scripts/PopPsiSeq_summary.Rmd',output_file='{output.pdf_out}')"  """)
-#		shell(""" R -e Sys.setenv"(RSTUDIO_PANDOC='{pandoc_path}')" -e  "thetitle='My title'; theauthor='me'; rmarkdown::render('scripts/PopPsiSeq_summary.Rmd',output_file='{output.pdf_out}')"  """)
-#		shell(""" cp scripts/{output.pdf_out} {output.pdf_out} """)
-#pandoc_path="/nas/longleaf/apps/rstudio/1.0.136/bin/pandoc"
-#R -e Sys.setenv"(RSTUDIO_PANDOC='$pandoc_path')" -e  rmarkdown::render"('$markDown_in',output_file='$pdf_Out')"
-#R -e "setwd('/proj/cdjones_lab/csoeder/PopPsiSeq')" -e Sys.setenv"(RSTUDIO_PANDOC='$pandoc_path')" -e  rmarkdown::render"('scripts/PopPsiSeq_summary.Rmd',output_file='test.pdf')"
+		shell("python3 scripts/bin_by_SNPs.py -i {input.shared_snps} -o {output.windowed_out}.tmp -b {wildcards.bin_size} -s {wildcards.slide_rate}  -c 15,16,16 -m 'sum,sum,count' --header_skip 1 " )
+		shell("paste <( cut -f 1-3 {output.windowed_out}.tmp ) <( cut -f 4- {output.windowed_out}.tmp | nl -n rz ) > {output.windowed_out}")
+		shell("rm {output.windowed_out}.tmp " )
 
 
 
+rule PopPsiSeq_lifter:
+	input:
+#		unlifted='variant_comparisons/{sample}_and_{compare}_vs_{parent}.{aligner}.sharedSnps.bed'
+		unlifted="data/intermediate/freq_shift/{prefix}.vs_{ref_genome}.{aligner}.frqShift"
+	output:
+#		lifted='data/intermediate/freq_shift/PsiSeq{version,.*}/{lift_genome}/{aligner}/{sample}.SNPs_shared_with.{eff_naught}.vs_{ref_genome}.{aligner}.lifted_to_{lift_genome}.bed',
+		lifted='data/intermediate/freq_shift/{prefix}.vs_{lift_genome}.{aligner}.lifted_from_{ref_genome}.frqShift',
+		too_heavy='data/intermediate/freq_shift/{prefix}.vs_{lift_genome}.{aligner}.2Heavy2Lift_from_{ref_genome}'
+	params:
+		runmem_gb=32,
+		runtime="12:00:00",
+		cores=1
+	run:
+#		chain = chain_dict_by_destination[wildcards.ref_genome][wildcards.lift_genome]
+		chain = chain_dict_by_destination[wildcards.lift_genome][wildcards.ref_genome]
+#		shell("mkdir -p data/intermediate/shared_snps/PsiSeq{wildcards.version}/{wildcards.lift_genome}/{wildcards.aligner}/")
+		shell(
+			'/nas/longleaf/home/csoeder/modules/UCSC_utils/liftOver -bedPlus=3 <( tail -n +2 {input.unlifted} ) {chain} {output.lifted}.tmp {output.too_heavy}'
+		)
+		shell(
+			'bedtools sort -i {output.lifted}.tmp > {output.lifted}'
+		)
+		shell(
+			'rm {output.lifted}.tmp'
+		)
+
+ruleorder: calc_frq_shift > PopPsiSeq_lifter
+
+
+
+
+
+rule DAGnabbit:
+	input:
+		target = "{path_prefix}/{file_prefix}"
+	output:
+		dag_nabbed = "meta/pipeline_schematics/{path_prefix}/{file_prefix,[^\/]+}.png"
+	params:
+		runmem_gb=1,
+		runtime="10:00",
+		cores=8,
+	run:
+		shell("""rm -rf {output.dag_nabbed};  mkdir -p meta/pipeline_schematics/{wildcards.path_prefix}/ """)
+
+		shell(""" snakemake --rulegraph {input.target} | dot -T png > {output.dag_nabbed} """)
+
+
+# rule write_report:
+	# input:
+		# reference_genome_summary = ["meta/reference_genomes.summary"],
+		# sequenced_reads_summary=["meta/sequenced_reads.dat"],
+		# alignment_summaries = expand("meta/alignments.vs_{ref_genome}.{aligner}.summary", ref_genome=['droSim1', 'droSec1'], aligner=['bwa','bwaUniq']),
+		# full_variant_summary = expand("meta/{prefix}.calledVariants.{aligner}.summary", aligner=["bwaUniq"], prefix=["all_samples"] ),
+		# windowed_frq_shifts = expand("variant_analysis/freqShift/all_samples.{treat}_with_PopSec_and_PopSim.vs_droSim1.bwaUniq.windowed_w100000_s100000.frqShift", treat = ['selection','control']),
+		# distances = expand("variants/all_samples.vs_{ref_genome}.bwaUniq/distances/from.all.to.all.{ref_genome}_w100000_s100000.distanceRoster",ref_genome=['droSim1', 'droSec1']),
+	# output:
+		# pdf_out="thingy.pdf"
+	# params:
+		# runmem_gb=8,
+		# runtime="1:00:00",
+		# cores=2,
+	# message:
+		# "writing up the results.... "
+	# run:
+		# pandoc_path="/nas/longleaf/apps/rstudio/1.0.136/bin/pandoc"
+		# pwd = subprocess.check_output("pwd",shell=True).decode().rstrip()+"/"
+		# shell(""" R -e "setwd('{pwd}');Sys.setenv(RSTUDIO_PANDOC='{pandoc_path}')" -e  "peaDubDee='{pwd}'; rmarkdown::render('scripts/PopPsiSeq_summary.Rmd',output_file='{pwd}{output.pdf_out}')"  """)
+# #		shell(""" R -e "setwd('{pwd}/');" -e Sys.setenv"(RSTUDIO_PANDOC='{pandoc_path}')" -e  rmarkdown::render"('scripts/PopPsiSeq_summary.Rmd',output_file='{output.pdf_out}')"  """)
+# #		shell(""" R -e Sys.setenv"(RSTUDIO_PANDOC='{pandoc_path}')" -e  "thetitle='My title'; theauthor='me'; rmarkdown::render('scripts/PopPsiSeq_summary.Rmd',output_file='{output.pdf_out}')"  """)
+# #		shell(""" cp scripts/{output.pdf_out} {output.pdf_out} """)
+# #pandoc_path="/nas/longleaf/apps/rstudio/1.0.136/bin/pandoc"
+# #R -e Sys.setenv"(RSTUDIO_PANDOC='$pandoc_path')" -e  rmarkdown::render"('$markDown_in',output_file='$pdf_Out')"
+# #R -e "setwd('/proj/cdjones_lab/csoeder/PopPsiSeq')" -e Sys.setenv"(RSTUDIO_PANDOC='$pandoc_path')" -e  rmarkdown::render"('scripts/PopPsiSeq_summary.Rmd',output_file='test.pdf')"
 
 
 

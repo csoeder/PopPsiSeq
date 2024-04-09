@@ -1,0 +1,262 @@
+
+
+
+############################################################################  
+#######		Calculating VCF-based distance metric by windowed 	####
+############################################################################  
+
+rule pairwise_VCF_distance_metric_windowed:
+	input:
+		vcf_in="data/intermediate/variants/{prefix}.vs_{ref_genome}.{aligner}.vcf",
+		windoze_in = "utils/{window_prefix}.windows.bed" #generalize this
+	output:
+		pairdist_out = ["data/intermediate/distances/hamming/{prefix}.vs_{ref_genome}.{aligner}/{indiv_1}/{indiv_2}.{window_prefix}.bed","data/intermediate/distances/hamming/{prefix}.vs_{ref_genome}.{aligner}/{indiv_2}/{indiv_1}.{window_prefix}.bed"]
+	params:
+		runmem_gb=16,
+		runtime = "4:00:00",
+		cores=2,
+	run:
+		shell(
+			"""
+			mkdir -p data/intermediate/distances/hamming/{wildcards.prefix}.vs_{wildcards.ref_genome}.{wildcards.aligner}/{wildcards.indiv_1}/
+			bedtools map -a {input.windoze_in} -b <(bcftools query -f '%CHROM\t%POS[\t%GT]\n' -s {wildcards.indiv_1},{wildcards.indiv_2} {input.vcf_in} | sed -e 's/1\/1/2/g' | sed -e 's/0\/1/1/g' | sed -e 's/1\/0/1/g' | sed -e 's/0\/0/0/g' | sed -e 's/\./NA/g'|  grep -v -w NA | awk '{{print $1"\t"$2"\t"$2+1"\tname\t"0"\t*\t"sqrt(($3-$4)^2)}}' | bedtools sort -i - ) -c 7,7 -o sum,count | awk '{{if($6>0)print $1"\t"$2"\t"$3"\t"$4"\t"$5/(2*$6) ;else print $1"\t"$2"\t"$3"\t"$4"\tNA"}}'  > {output.pairdist_out[0]}
+			"""
+			)
+		if len(set(output.pairdist_out)) > 1:
+			shell(
+				"""
+				mkdir -p data/intermediate/distances/hamming/{wildcards.prefix}.vs_{wildcards.ref_genome}.{wildcards.aligner}/{wildcards.indiv_2}/
+				cp {output.pairdist_out[0]} {output.pairdist_out[1]}
+				"""
+				)
+# 			hmm..... maybe wrap that one-liner up in a different script?
+#all_samples.chr2L.vs_droSim1.bwaUniq.vcf
+
+rule all_dist_to_indiv_by_group:
+	input:
+#		groupies = lambda wildcards: expand("variants/{prefix}.vs_{ref_genome}.{aligner}/distances/{indiv}/{groupie}.{window_prefix}.bed", prefix=wildcards.prefix, ref_genome=wildcards.ref_genome, aligner=wildcards.aligner, indiv=wildcards.indiv, groupie=sampname_by_group[wildcards.group], window_prefix=wildcards.window_prefix),
+		groupies = lambda wildcards: expand("data/intermediate/distances/hamming/{prefix}.vs_{ref_genome}.{aligner}/{indiv}/{groupie}.{window_prefix}.bed", prefix=wildcards.prefix, ref_genome=wildcards.ref_genome, aligner=wildcards.aligner, indiv=wildcards.indiv, groupie=sampname_by_group[wildcards.group], window_prefix=wildcards.window_prefix),
+	output:
+		group_dist = "data/intermediate/distances/hamming/{prefix}.vs_{ref_genome}.{aligner}/{indiv}/{group}.{window_prefix}.tbl"
+	params:
+		runmem_gb=8,
+		runtime = "10:00",
+		cores=2,
+	run:
+		shell("touch {output.group_dist}.tmp")
+
+		for groupie in sampname_by_group[wildcards.group]:
+						
+			# shell("""cat variants/{wildcards.prefix}.vs_{wildcards.ref_genome}.{wildcards.aligner}/distances/{wildcards.indiv}/{groupie}.{wildcards.window_prefix}.bed | cut -f 5 | cat <(echo {groupie}) - | paste {output.group_dist}.tmp - > {output.group_dist} 
+					# cp {output.group_dist} {output.group_dist}.tmp
+					# """)
+			shell("""cat data/intermediate/distances/hamming/{wildcards.prefix}.vs_{wildcards.ref_genome}.{wildcards.aligner}/{wildcards.indiv}/{groupie}.{wildcards.window_prefix}.bed | cut -f 5 | cat <(echo {groupie}) - | paste {output.group_dist}.tmp - > {output.group_dist} 
+					cp {output.group_dist} {output.group_dist}.tmp
+					""")
+		shell("""cat <(echo "chr\tstart\tstop\twin") data/intermediate/distances/hamming/{wildcards.prefix}.vs_{wildcards.ref_genome}.{wildcards.aligner}/{wildcards.indiv}/{groupie}.{wildcards.window_prefix}.bed | cut -f 1-4 | paste - {output.group_dist}.tmp > {output.group_dist}""")
+
+		shell("rm {output.group_dist}.tmp")
+
+rule group2group_VCF_distance:
+	input:
+#		tables_in = lambda wildcards: expand("variants/{prefix}.vs_{ref_genome}.{aligner}/distances/{indiv}/{group2}.{window_prefix}.tbl", prefix=wildcards.prefix, ref_genome=wildcards.ref_genome, aligner=wildcards.aligner, group2=wildcards.group2, indiv=sampname_by_group[wildcards.group1], window_prefix=wildcards.window_prefix)
+		tables_in = lambda wildcards: expand("data/intermediate/distances/hamming/{prefix}.vs_{ref_genome}.{aligner}/{indiv}/{group2}.{window_prefix}.tbl", prefix=wildcards.prefix, ref_genome=wildcards.ref_genome, aligner=wildcards.aligner, group2=wildcards.group2, indiv=sampname_by_group[wildcards.group1], window_prefix=wildcards.window_prefix)
+	output:
+#		roster_out = "variants/{prefix}.vs_{ref_genome}.{aligner}/distances/from.{group1}.to.{group2}.{window_prefix}.distanceRoster"
+		roster_out = "data/intermediate/distances/hamming/{prefix}.vs_{ref_genome}.{aligner}/from.{group1}.to.{group2}.{window_prefix}.distanceRoster"
+	params:
+		runmem_gb=1,
+		runtime = "1:00",
+		cores=1,
+	shell:
+		"""echo {input.tables_in} | tr " " "\n" > {output.roster_out}"""
+
+############################################################################  
+#######		other VCF statistics 	####
+############################################################################  
+
+rule population_VCF_tajD:
+	input: 
+		varz = "data/intermediate/variants/{prefix}.vs_{ref_genome}.{aligner}.vcf", 
+	output:
+		tajD = "data/intermediate/population_genetics/tajimasD/{prefix}.vs_{ref_genome}.{aligner}.TajD.bg",
+	params:
+		runmem_gb=8,
+		runtime="12:00:00",
+		cores=8,
+		win_size = 10000,
+	run:
+
+		subpath = "/".join(wildcards.prefix.split("/")[:-1])  
+
+		shell(""" mkdir -p data/intermediate/population_genetics/tajimasD/""")
+		shell(""" vcftools --vcf {input.varz}  --TajimaD {params.win_size} --stdout | grep -v "BIN_START" | awk '{{print"chr"$1"\t"$2"\t"$2+{params.win_size}"\t"$3"\t"$4}}' |sed -e 's/chrchr/chr/g' > {output.tajD} """)
+#		shell(""" vcftools --vcf {input.varz}  --TajimaD {params.win_size} --stdout | grep -v "BIN_START" | awk '{{print"chr"$1"\t"$2"\t"$2+{params.win_size}"\tname\t0\t.\t"$3"\t"$4}}' |sed -e 's/chrchr/chr/g' > {output.tajD} """)
+
+rule population_VCF_pi:
+	input: 
+		varz = "data/intermediate/variants/{prefix}.vs_{ref_genome}.{aligner}.vcf", 
+	output:
+		pi = "data/intermediate/population_genetics/nucleotide_diversity/{prefix}.vs_{ref_genome}.{aligner}.pi.bg",
+	params:
+		runmem_gb=8,
+		runtime="12:00:00",
+		cores=8,
+		win_size = 10000,
+	run:
+
+		shell(""" mkdir -p data/intermediate/population_genetics/nucleotide_diversity/""")
+#		shell(""" vcftools --vcf {input.varz} --window-pi  {params.win_size} --stdout | grep -v "BIN_START" | awk '{{print"chr"$1"\t"$2"\t"$3"\tname\t0\t.\t"$4"\t"$5"\t"$6}}'  |sed -e 's/chrchr/chr/g'  > {output.pi} """)
+		shell(""" vcftools --vcf {input.varz} --window-pi  {params.win_size} --stdout | grep -v "BIN_START"  > {output.pi} """)
+
+
+
+rule population_VCF_Fst:
+	input: 
+		varz = "data/intermediate/variants/{prefix}.vs_{ref_genome}.{aligner}.vcf", 
+	output:
+		fst = "data/intermediate/population_genetics/Fst/{prefix}.vs_{ref_genome}.{aligner}.Fst.{contrast}.bg",
+	params:
+		runmem_gb=8,
+		runtime="12:00:00",
+		cores=8,
+		win_size = 10000,
+	run:
+
+		shell(""" mkdir -p data/intermediate/population_genetics/Fst/ utils/Fst/lists/""")
+#		fst = fst_by_name[wildcards.contrast]
+
+		pops = wildcards.contrast.split("_and_")
+
+		weir_str = ' '
+
+		for sub in pops:
+			sub_list = "utils/Fst/lists/"+wildcards.prefix+".vs_"+wildcards.ref_genome+"."+wildcards.aligner+".Fst."+wildcards.contrast+"."+sub+".list"
+			shell(""" touch {sub_list} ; rm {sub_list} ;  """)
+
+			for samp in sampname_by_group[sub]:
+				shell(""" echo "{samp}" >>  {sub_list} """)
+			weir_str = '%s --weir-fst-pop  %s ' % (weir_str, sub_list)
+
+		shell(""" vcftools --vcf {input.varz} {weir_str} --fst-window-size {params.win_size} --fst-window-step {params.win_size} --stdout | grep -v "BIN_START" | awk '{{print"chr"$0}}' > {output.fst} """)
+#		shell(""" vcftools --vcf {input.varz} {weir_str} --fst-window-size {params.win_size} --fst-window-step {params.win_size} --stdout | grep -v "BIN_START" | cut -f 1,2,3,7- | awk '{{print"chr"$0}}' > {output.fst} """)
+		shell(""" sed -i 's/chrchr/chr/g' {output.fst} """)
+
+
+
+
+rule vcf_to_phylo:
+	input:
+		vcf_in="data/intermediate/variants/{prefix}.vs_{ref_genome}.{aligner}.vcf",
+		windoze_in = "utils/{ref_genome}_w{w}_s{s}.windows.bed" #generalize this
+	output:
+		clustal_tree = "data/intermediate/trees/clustalw/{prefix}.vs_{ref_genome}.w{w}_s{s}.{aligner}.clustalw.bed",
+		phyml_tree = "data/intermediate/trees/phyml/{prefix}.vs_{ref_genome}.w{w}_s{s}.{aligner}.phyml.bed",
+#		phyml_tree = "variants/{group}.vs_{ref_genome}.{aligner}.phylip_phyml_tree.txt"
+	params:
+		runmem_gb=16,
+		runtime="12:00:00",
+		cores=1,
+		len_thresh = 10,
+	message:
+		"collecting all alignment metadata.... "
+	run:
+
+		shell(""" rm -rf {output.clustal_tree} """)
+
+
+		tmp_dir = "data/intermediate/trees/.clutter/"+wildcards.prefix+".vs_"+wildcards.ref_genome+"."+wildcards.aligner+"/"
+		shell(""" mkdir -p {tmp_dir} data/intermediate/trees/clustal/ data/intermediate/trees/phyml/ """)
+		shell(""" split -a 5 --additional-suffix=.bed -x -l 1 {input.windoze_in} {tmp_dir}window.w{wildcards.w}_s{wildcards.s}. """)
+		
+		window_list = os.listdir(tmp_dir)
+		window_list = [w for w in window_list if w.startswith("window.w"+wildcards.w+"_s"+wildcards.s) and w.endswith(".bed")]
+		sample_list = subprocess.check_output("bcftools query -l "+input.vcf_in,shell=True).decode().rstrip().split("\n")
+
+
+		shell("""rm -rf {output.phyml_tree}.tmp {output.clustal_tree}.tmp """)
+
+		for window in window_list:
+			shell(""" bedtools intersect -header -wa -a {input.vcf_in} -b {tmp_dir}/{window}  > {tmp_dir}{window}.vcf """)
+			msa_fa = tmp_dir+window+".fa"
+			shell(""" rm -f {msa_fa}""")
+
+
+
+#			for samp in sampname_by_group[wildcards.group]:
+			write_me = ""
+			seqz = []
+			for samp in sample_list:
+				sequence = subprocess.check_output("bcftools query -s "+samp+" -f '[%TGT]' "+tmp_dir+"/"+window+".vcf | tr -d '/' | awk '{{print$0;}}' ",shell=True).decode().rstrip()
+
+				if sequence != "":
+					write_me += ">" + samp + "\n"
+					write_me += sequence + "\n"
+					seqz.append(sequence)
+			seqz = list(set(seqz))
+
+			if write_me != "" and len(seqz) > 1 and len(sequence) > params.len_thresh :
+
+				phial = open(tmp_dir+"/"+window+".fa", "w")
+				phial.write(write_me)
+				phial.close()
+				
+				shell(""" /nas/longleaf/home/csoeder/modules/clustalw-2.1/clustalw2 -infile={tmp_dir}/{window}.fa -tree -outputtree=phylip -clustering=Neighbour-joining  """)
+
+				shell("""  paste <( cat {tmp_dir}/{window} | awk '{{print$0"\t0\t."}}' ) <( cat {tmp_dir}/{window}.ph | tr -d "\n" ) >> {output.clustal_tree}.tmp """)
+
+				records = SeqIO.parse(tmp_dir+"/"+window+".fa", "fasta")
+				count = SeqIO.write(records, tmp_dir+"/"+window+".phylip", "phylip-relaxed")
+				print("Converted %i records" % count)
+
+				shell(""" /nas/longleaf/home/csoeder/modules/PhyML-3.1/PhyML-3.1_linux64 --input {tmp_dir}/{window}.phylip --datatype nt  """)
+
+				shell("""  paste <( cat {tmp_dir}/{window} | awk '{{print$0"\t0\t."}}' ) {tmp_dir}/{window}.phylip_phyml_tree.txt >> {output.phyml_tree}.tmp """)
+
+			shell("  rm -rf "+tmp_dir + window+"* ")
+		shell("""
+		cat {output.phyml_tree}.tmp | bedtools sort -i - > {output.phyml_tree};
+		cat {output.clustal_tree}.tmp | bedtools sort -i - > {output.clustal_tree};
+		""")
+
+
+
+
+
+
+rule treebed_to_distancebed:
+	input:
+#		vcf_in="data/intermediate/variants/{prefix}.vs_{ref_genome}.{aligner}.vcf",
+#		windoze_in = "utils/{ref_genome}_w{w}_s{s}.windows.bed" #generalize this
+		treebed_in = "data/intermediate/trees/{tree_algo}/{prefix}.vs_{ref_genome}.w{w}_s{s}.{aligner}.{tree_algo}.bed" #generalize this
+	output:
+		dist_out = "data/intermediate/distances/{tree_algo}/{prefix}.vs_{ref_genome}.{aligner}/{ref_genome}.w{w}_s{s}.distanceRoster"
+	params:
+		runmem_gb=16,
+		runtime="12:00:00",
+		cores=1,
+		len_thresh = 5,
+	message:
+		"collecting all alignment metadata.... "
+	run:
+
+
+
+		shell(""" rm -rf {output.dist_out}""")
+		vcf = "data/intermediate/variants/"+wildcards.prefix+".vs_"+wildcards.ref_genome+"."+wildcards.aligner+".vcf"
+		sample_list = subprocess.check_output("bcftools query -l "+ vcf ,shell=True).decode().rstrip().split("\n")
+		sample_string = ",".join(sample_list)
+		out_path = "data/intermediate/distances/"+wildcards.tree_algo+"/"+wildcards.prefix+".vs_"+wildcards.ref_genome+"."+wildcards.aligner
+		out_file = wildcards.prefix+"."+wildcards.ref_genome+".w"+wildcards.w+"_s"+wildcards.s+".tbl"
+		for samp in sample_list:
+			shell(""" mkdir -p {out_path}/{samp} """)
+		
+		shell(""" Rscript scripts/treeBed2distanceBed.R {input.treebed_in} {sample_string} {out_path} {out_file}""")
+
+		for samp in sample_list:
+			shell(""" echo "{out_path}/{samp}/{out_file}" >> {output.dist_out} """)
+
+
+
+
+

@@ -1,0 +1,135 @@
+include: "../Snakefile"
+
+
+rule mpiler:
+	input:
+		sorted_bam = "data/intermediate/mapped_reads/{aligner}/{sample}.vs_{ref_genome}.{aligner}.sort.bam",
+	output:
+		mpile = "data/intermediate/mapped_reads/{aligner}/{sample}.vs_{ref_genome}.{aligner}.mpileup",
+	params:
+		runmem_gb=8,
+		runtime="3:00:00",
+		cores=1,
+	run:
+		ref_genome = ref_genome_by_name[wildcards.ref_genome]['path']		
+		shell(
+		"samtools mpileup -Bf {ref_genome} {input.sorted_bam} > {output.mpile}"
+		)
+
+
+rule window_sharedSnps:
+	input:
+		shared_snps='data/intermediate/shared_snps/PsiSeq{version}/{ref_genome}/{aligner}/{sharedSnp_prefix}.bed',
+		windows_in = "utils/genome_windows/{ref_genome}_w{window_size}_s{slide_rate}.windows.bed"
+	output:
+		windowed_out = "data/ultimate/shared_SNPs/PsiSeq{version,.*}/{ref_genome}/{aligner}/{sharedSnp_prefix}.genomeWindowed_w{window_size}_s{slide_rate}.bed"
+	params:
+		runmem_gb=32,
+		runtime="1:00:00",
+		cores=4,
+	shell:
+		"""
+		mkdir -p data/ultimate/shared_SNPs/PsiSeq{wildcards.version}/{wildcards.ref_genome}/{wildcards.aligner}/ ;
+		bedtools map -c 4,4 -o sum,count -null NA -a {input.windows_in} -b <(  bedtools sort -i {input.shared_snps} ) > {output.windowed_out} ;
+  		"""
+#		bedtools map -c 4,4 -o sum,count -null NA -a {input.windows_in} -b <(  sort -k 1,1 -k2,2n {input.shared_snps} ) > {output.windowed_out} ;
+
+
+
+
+####				PsiSeq			##########
+
+rule og_framenter:
+	output:
+		sim_seq='data/simulated/sequence/single_end/erics_fragmenter/{ref_genome}.L{read_len}.C{coverage}.E0.{error_freq}.fastq'
+	params:
+		runmem_gb=8,
+		runtime="3:00:00",
+		cores=1,
+	run:
+		#lookup ref gen file from config
+		#
+#		perl fragmenter.pl reference.fa output.fa read-length coverage artificial-error-frequency
+		err = float("0." + wildcards.error_freq)
+		genome = ref_genome_by_name[wildcards.ref_genome]["path"]
+
+		shell(""" perl scripts/legacy/PsiSeq/fragmenter.pl {genome} data/simulated/sequence/single_end/erics_fragmenter/{wildcards.ref_genome}.L{wildcards.read_len}.C{wildcards.coverage}.E0.{wildcards.error_freq}.fasta {wildcards.read_len} {wildcards.coverage} {err} """)
+		#https://bioinformatics.stackexchange.com/a/11213
+		shell(""" cat data/simulated/sequence/single_end/erics_fragmenter/{wildcards.ref_genome}.L{wildcards.read_len}.C{wildcards.coverage}.E0.{wildcards.error_freq}.fasta | paste - - | perl -ne 'chomp; s/^>/@/; @v = split /\t/; printf("%s\n%s\n+\n%s\n", $v[0], $v[1], "B"x length($v[1]))' > {output.sim_seq} """)
+
+
+rule PsiSeq1:
+	input:
+		offspring_mpile='data/intermediate/mapped_reads/{aligner}/{sample}.vs_{ref_genome}.{aligner}.mpileup',
+		otherparent_mpile="data/intermediate/mapped_reads/{aligner}/{eff_naught}.vs_{ref_genome}.{aligner}.mpileup",
+	output:
+		shared_snps='data/intermediate/shared_snps/PsiSeq/{ref_genome}/{aligner}/{sample}.SNPs_shared_with.{eff_naught}.vs_{ref_genome}.{aligner}.bed'
+	params:
+		runmem_gb=8,
+		runtime="3:00:00",
+		cores=1,
+	run:
+		shell(
+		"""
+		perl scripts/legacy/PsiSeq/shared_snps_v3.1.pl {input.offspring_mpile} {input.otherparent_mpile} {output.shared_snps}.pre;
+		cat {output.shared_snps}.pre | awk '{{print$1"\t"$2"\t"$2"\t"$3}}' | bedtools sort > {output.shared_snps}
+		rm {output.shared_snps}.pre ;
+		"""
+		)
+
+
+
+####				PsiSeq2			##########
+
+rule shared_snipper:
+	input:
+		offspring_mpile='data/intermediate/mapped_reads/{aligner}/{sample}.vs_{ref_genome}.{aligner}.mpileup',
+		otherparent_mpile="data/intermediate/mapped_reads/{aligner}/{eff_naught}.vs_{ref_genome}.{aligner}.mpileup",
+	output:
+		shared_snps='data/intermediate/shared_snps/PsiSeq2/{ref_genome}/{aligner}/{sample}.SNPs_shared_with.{eff_naught}.vs_{ref_genome}.{aligner}.bed'
+	params:
+		minCov=3,
+		minFrac=0.9,
+		runmem_gb=64,
+		cores=8,
+		runtime="6:00:00"
+	run:
+		uniquifier = subprocess.check_output(""" echo $(date +%N)*$(date +%N) | bc | md5sum | cut -f 1 -d " "  """  ,shell=True).decode().rstrip()[-5:].upper()		
+		shell(""" mkdir -p data/intermediate/shared_snps/PsiSeq2/{wildcards.ref_genome}/{wildcards.aligner}/  """)
+#		suffix = ''.join(wildcards.sample(ascii_uppercase + digits, k=10))
+		shell(""" cat {input.offspring_mpile} | awk '{{if($4 >= {params.minCov})print;}}' > {input.offspring_mpile}.filtCov.{wildcards.eff_naught}.{uniquifier} """)
+		shell(""" cat {input.otherparent_mpile}| awk '{{if($4 >= {params.minCov})print;}}' > {input.otherparent_mpile}.filtCov.{wildcards.sample}.{uniquifier} """)
+		fai = ref_genome_by_name[wildcards.ref_genome]["fai"]
+		shell("python3 scripts/legacy/PsiSeq2/shared_snps.v4.py -vvvvv -c {params.minCov} -f {params.minFrac} -F {fai} {input.offspring_mpile}.filtCov.{wildcards.eff_naught}.{uniquifier} {input.otherparent_mpile}.filtCov.{wildcards.sample}.{uniquifier} {output.shared_snps}.tmp ")
+		shell(" cat {output.shared_snps}.tmp | bedtools sort > {output.shared_snps} ")
+		shell("rm {output.shared_snps}.tmp {input.offspring_mpile}.filtCov.{wildcards.eff_naught}.{uniquifier} {input.otherparent_mpile}.filtCov.{wildcards.sample}.{uniquifier} ")
+
+
+
+rule lifter:
+	input:
+#		unlifted='variant_comparisons/{sample}_and_{compare}_vs_{parent}.{aligner}.sharedSnps.bed'
+		unlifted='data/intermediate/shared_snps/PsiSeq{version}/{ref_genome}/{aligner}/{sample}.SNPs_shared_with.{eff_naught}.vs_{ref_genome}.{aligner}.bed'
+	output:
+		lifted='data/intermediate/shared_snps/PsiSeq{version,.*}/{lift_genome}/{aligner}/{sample}.SNPs_shared_with.{eff_naught}.vs_{ref_genome}.{aligner}.lifted_to_{lift_genome}.bed',
+		too_heavy='data/intermediate/shared_snps/PsiSeq{version,.*}/{lift_genome}/{aligner}/{sample}.SNPs_shared_with.{eff_naught}.vs_{ref_genome}.{aligner}.2Heavy2Lift_to_{lift_genome}'
+	params:
+		runmem_gb=32,
+		runtime="12:00:00",
+		cores=1
+	run:
+		chain = chain_dict_by_destination[wildcards.lift_genome][wildcards.ref_genome]
+		shell("mkdir -p data/intermediate/shared_snps/PsiSeq{wildcards.version}/{wildcards.lift_genome}/{wildcards.aligner}/")
+		shell(
+			"""/nas/longleaf/home/csoeder/modules/UCSC_utils/liftOver <( cat {input.unlifted} | awk '{{print$1"\t"$2"\t"$2+1"\t"$4}}' )  {chain} {output.lifted}.tmp {output.too_heavy}"""
+		)
+#		shell(
+#			'/nas/longleaf/home/csoeder/modules/UCSC_utils/liftOver {input.unlifted} {chain} {output.lifted}.tmp {output.too_heavy}'
+#		)
+		shell(
+			'bedtools sort -i {output.lifted}.tmp > {output.lifted}'
+		)
+		shell(
+			'rm {output.lifted}.tmp'
+		)
+

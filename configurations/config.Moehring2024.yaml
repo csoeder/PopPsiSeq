@@ -1,0 +1,132 @@
+data_sets:
+    - name: BCM10F
+      paired: True
+      readsfile1: BCM10F_R1.fastq
+      readsfile2: BCM10F_R2.fastq
+      source: tom hsiang
+      path: data/raw/reads/fly/
+      subgroups: [all, normalSperm, mauritianaBackcross, mauBackcrossNormal]
+      genealogy: mauritiana backcross
+      genotype: wildtype
+    - name: BCM10NE
+      paired: True
+      readsfile1: BCM10NE.1_R1.fastq
+      readsfile2: BCM10NE.1_R2.fastq
+      source: tom hsiang
+      path: data/raw/reads/fly/
+      subgroups: [all, mutantSperm, mauritianaBackcross, mauBackcrossMutant]
+      genealogy: mauritiana backcross
+      genotype: needle eye
+    - name: BCS10F
+      paired: True
+      readsfile1: BCS10F_R1.fastq
+      readsfile2: BCS10F_R2.fastq
+      source: tom hsiang
+      path: data/raw/reads/fly/
+      subgroups: [all, normalSperm, simulansBackcross, simBackcrossNormal]
+      genealogy: simulans backcross
+      genotype: wildtype
+    - name: BCS10NE
+      paired: True
+      readsfile1: BCS10NE.1_R1.fastq
+      readsfile2: BCS10NE.1_R2.fastq
+      source: tom hsiang
+      path: data/raw/reads/fly/
+      subgroups: [all, mutantSperm, simulansBackcross, simBackcrossMutant]
+      genealogy: simulans backcross
+      genotype: needle eye
+    - name: mauGFP
+      paired: True
+      readsfile1: mauGFP_R1.fastq
+      readsfile2: mauGFP_R2.fastq
+      source: tom hsiang
+      path: data/raw/reads/fly/
+      subgroups: [all, mauritiana]
+      genealogy: mauritiana
+      genotype: GFP
+    - name: simGFP
+      paired: True
+      readsfile1: simGFP_R1.fastq
+      readsfile2: simGFP_R2.fastq
+      source: tom hsiang
+      path: data/raw/reads/fly/
+      subgroups: [all, simulans]
+      genealogy: simulans
+      genotype: GFP
+
+
+reference_genomes:
+    - name: droSim1
+      species: drosophila simulans
+      path: /proj/cdjones_lab/Genomics_Data_Commons/genomes/drosophila_simulans/droSim1.fa
+      fai: /proj/cdjones_lab/Genomics_Data_Commons/genomes/drosophila_simulans/droSim1.fa.fai
+      source: UCSC Genome Browser
+
+    - name: prinDsim3
+      species: drosophila simulans
+      path: /proj/cdjones_lab/Genomics_Data_Commons/genomes/drosophila_simulans/GCF_016746395.2/GCF_016746395.2_Prin_Dsim_3.1_genomic.fna
+      fai: /proj/cdjones_lab/Genomics_Data_Commons/genomes/drosophila_simulans/GCF_016746395.2/GCF_016746395.2_Prin_Dsim_3.1_genomic.fna.fai
+      source: NCBI
+
+    - name: ncbiMau
+      species: drosophila mauritiana
+      path: /proj/cdjones_lab/Genomics_Data_Commons/genomes/drosophila_mauritiana/GCF_004382145.1/GCF_004382145.1_ASM438214v1_genomic.fna
+      fai: /proj/cdjones_lab/Genomics_Data_Commons/genomes/drosophila_mauritiana/GCF_004382145.1/GCF_004382145.1_ASM438214v1_genomic.fna.fai
+      source: NCBI
+
+    - name: BCM10NE
+      species: mauritiana backcross
+      path: data/external/assemblies/BCM10NE_soap49_149k.nt
+      fai: data/external/assemblies/BCM10NE_soap49_149k.nt.fai
+      source: moehring lab
+      
+    - name: BCM10WT
+      species: mauritiana backcross
+      path: data/external/assemblies/BCM10WT_soap35_111k.nt
+      fai: data/external/assemblies/BCM10WT_soap35_111k.nt.fai
+      source: moehring lab
+
+    - name: BCS10NE
+      species: simulans backcross
+      path: data/external/assemblies/BCS10NE_soap77_2k.nt
+      fai: data/external/assemblies/BCS10NE_soap77_2k.nt.fai
+      source: moehring lab
+
+    - name: BCS10WT
+      species: simulans backcross
+      path: data/external/assemblies/BCS10WT_abyss35_34k.nt
+      fai: data/external/assemblies/BCS10WT_abyss35_34k.nt.fai
+      source: moehring lab
+
+    - name: simGFP
+      species: drosophila simulans
+      path: data/external/assemblies/simGFP_soap39_36k.nt
+      fai: data/external/assemblies/simGFP_soap39_36k.nt.fai
+      source: moehring lab
+
+    - name: mauGFP
+      species: drosophila mauritiana
+      path: data/external/assemblies/mauGFP_soap77_175k.nt
+      fai: data/external/assemblies/mauGFP_soap77_175k.nt.fai
+      source: moehring lab
+
+
+lift_genomes:
+      dm6:
+            droSec1: /proj/cdjones_lab/Genomics_Data_Commons/genomes/LiftOver/droSec1ToDm6.over.chain
+            droSim1: /proj/cdjones_lab/Genomics_Data_Commons/genomes/LiftOver/droSim1ToDm6.over.chain
+
+
+
+annotations:      
+    - name: NCBIsim103
+      genome: prinDsim3
+#      bed_path: /proj/cdjones_lab/Genomics_Data_Commons/annotations/drosophila_simulans/
+      gtf_path: /proj/cdjones_lab/Genomics_Data_Commons/annotations/drosophila_simulans/GCF_016746395.2_Prin_Dsim_3.1_genomic.gtf
+      link: https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/016/746/395/GCF_016746395.2_Prin_Dsim_3.1/GCF_016746395.2_Prin_Dsim_3.1_genomic.gtf.gz
+      instructions: sdf
+      source: NCBI RefSeq
+      
+      
+
+#
