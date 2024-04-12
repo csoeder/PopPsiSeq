@@ -9,21 +9,22 @@ data_sets:
       source: NCBI
       SRA: SRR303333
       pub: Earley2011
-      subgroups: [all,selection,Earley2011,EarleyAll, cleanEarleyAll]
+      subgroups: [all,Earley2011]
 
     - name: fragSimulated_dSim1
       paired: False
-      subgroups: [none, simulated, fragsim1]
+      subgroups: [all, simulated, fragsim1]
       readsfile: droSim1.L100.C5.E0.0.fastq
       source: erics fragmenter
       path: data/simulated/sequence/single_end/erics_fragmenter/
+      experimental: synthetic
     - name: fragSimulated_dSec1
       paired: False
-      subgroups: [none, simulated, fragsec1]
+      subgroups: [all, simulated, fragsec1]
       readsfile: droSec1.L100.C5.E0.0.fastq
       source: erics fragmenter
       path: data/simulated/sequence/single_end/erics_fragmenter/
-
+      experimental: synthetic
 
 reference_genomes:
     - name: droSim1
