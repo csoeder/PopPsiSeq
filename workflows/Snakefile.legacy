@@ -3,26 +3,6 @@ include: "../Snakefile"
 
 
 
-rule all:
-	input: 
-		pdf_out="results/PsiSeq_legacy_code_example.pdf",
-	params:
-		runmem_gb=1,
-		runtime="0:01:00",
-		cores=1,
-	run:
-#		shell(""" mkdir -p results/figures/; touch results/figures/null.png; for fig in results/figures/*png; do mv $fig $(echo $fig| rev | cut -f 2- -d . | rev ).$(date +%d_%b_%Y).png; done;  rm results/figures/null.*.png; """)
-#		shell(""" mkdir -p results/figures/supp/ ; touch results/figures/supp/null.png; for fig in results/figures/supp/*png; do mv $fig $(echo $fig| rev | cut -f 2- -d . | rev ).$(date +%d_%b_%Y).png; done; rm results/figures/supp/null.*.png; """)
-
-#		shell(""" mkdir -p results/tables/ ; touch results/tables/null.tmp ; for phial in $(ls -p results/tables/ | grep -v /); do pre=$(echo $phial | rev | cut -f 2- -d . | rev ); suff=$(echo $phial | rev | cut -f 1 -d . | rev ); mv results/tables/$phial results/tables/$pre.$(date +%d_%b_%Y).$suff; done ; rm results/tables/null.*.tmp; """)
-#		shell(""" mkdir -p results/tables/supp/ ; touch results/tables/supp/null.tmp ; for phial in $(ls -p results/tables/supp/ | grep -v /); do pre=$(echo $phial | rev | cut -f 2- -d . | rev ); suff=$(echo $phial | rev | cut -f 1 -d . | rev ); mv results/tables/supp/$phial results/tables/supp/$pre.$(date +%d_%b_%Y).$suff; done ; rm results/tables/supp/null.*.tmp; """)
-
-		shell(""" mv results/PsiSeq_legacy_code_example.pdf results/PsiSeq_legacy_code_example.$(date +%d_%b_%Y).pdf """)
-#		shell(""" tar cf results.$(date +%d_%b_%Y).tar results/ """)
-
-
-
-
 rule mpiler:
 	input:
 		sorted_bam = "data/intermediate/mapped_reads/{aligner}/{sample}.vs_{ref_genome}.{aligner}.sort.bam",
@@ -159,30 +139,6 @@ rule lifter:
 		shell(
 			'rm {output.lifted}.tmp'
 		)
-
-
-
-
-rule write_report:
-	input:
-		reference_genome_summary = ["data/summaries/reference_genomes/reference_genomes.summary"],
-		sequenced_reads_summary=["data/summaries/intermediate/FASTP/all.sequenced_reads.dat"],
-		alignment_summaries = expand("data/summaries/intermediate/BAMs/all.vs_{ref_genome}.{aligner}.summary", ref_genome=['droSim1'], aligner=['bwa','bwaUniq']),
-		psiseq1 = "data/ultimate/shared_SNPs/PsiSeq/droSim1/bwaUniq/Earley2011.SNPs_shared_with.fragSimulated_dSec1.vs_droSim1.bwaUniq.genomeWindowed_w100000_s100000.bed",
-		psiseq2 = "data/ultimate/shared_SNPs/PsiSeq2/dm6/bwaUniq/Earley2011.SNPs_shared_with.fragSimulated_dSim1.vs_droSec1.bwaUniq.lifted_to_dm6.genomeWindowed_w100000_s100000.bed",
-	output:
-		pdf_out="results/PsiSeq_legacy_code_example.pdf"
-	params:
-		runmem_gb=8,
-		runtime="1:00:00",
-		cores=2,
-	message:
-		"writing up the results.... "
-	run:
-		shell(""" mkdir -p results/figures/ results/tables/ """)
-		pandoc_path="/nas/longleaf/apps/rstudio/1.0.136/bin/pandoc"
-		pwd = subprocess.check_output("pwd",shell=True).decode().rstrip()+"/"
-		shell(""" R -e "setwd('{pwd}');Sys.setenv(RSTUDIO_PANDOC='{pandoc_path}')" -e  "peaDubDee='{pwd}'; rmarkdown::render('markdowns/PopPsiSeq_summary.Rmd',output_file='{pwd}{output.pdf_out}')"  """)
 
 
 

@@ -1,6 +1,4 @@
 data_sets:
-
-
     - name: Earley2011
       paired: False
       path: data/external/sequence/single_end/SRR303333/
@@ -42,5 +40,10 @@ reference_genomes:
       path: /proj/cdjones_lab/Genomics_Data_Commons/genomes/drosophila_sechellia/droSec1.fa
       fai: /proj/cdjones_lab/Genomics_Data_Commons/genomes/drosophila_sechellia/droSec1.fa.fai
       source: UCSC Genome Browser
+
+lift_genomes:
+      dm6:
+            droSec1: /proj/cdjones_lab/Genomics_Data_Commons/genomes/LiftOver/droSec1ToDm6.over.chain
+            droSim1: /proj/cdjones_lab/Genomics_Data_Commons/genomes/LiftOver/droSim1ToDm6.over.chain
 
 
