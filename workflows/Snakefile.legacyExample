@@ -41,7 +41,7 @@ rule write_report:
 		"writing up the results.... "
 	run:
 		shell(""" mkdir -p results/figures/ results/tables/ """)
-		pandoc_path="/nas/longleaf/apps/rstudio/1.0.136/bin/pandoc"
+		pandoc_path="/nas/longleaf/apps/rstudio/1.2.1335/bin/pandoc"
 		pwd = subprocess.check_output("pwd",shell=True).decode().rstrip()+"/"
 		shell(""" R -e "setwd('{pwd}');Sys.setenv(RSTUDIO_PANDOC='{pandoc_path}')" -e  "peaDubDee='{pwd}'; rmarkdown::render('markdowns/PsiSeq_legacy.Rmd',output_file='{pwd}{output.pdf_out}')"  """)
 

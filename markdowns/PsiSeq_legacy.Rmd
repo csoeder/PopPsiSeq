@@ -8,14 +8,17 @@ output:
     toc_depth: 5
     number_sections: true
   html_document: default
-bibliography: references.bib
+bibliography: legacy_references.bib
 ---
 
 ```{r setup, include=FALSE}
 require("knitr")
 knitr::opts_chunk$set(echo = T)
 #knitr::opts_knit$set(root.dir='/proj/cdjones_lab/csoeder/PopPsiSeq/')
-knitr::opts_knit$set(root.dir=normalizePath("/proj/cdjones_lab/csoeder/legacyPopTest/PopPsiSeq/"))
+
+
+#knitr::opts_knit$set(root.dir=normalizePath("/proj/cdjones_lab/csoeder/legacyPopTest/PopPsiSeq/"))
+knitr::opts_knit$set(root.dir=normalizePath(peaDubDee))
 
 #knitr::opts_knit$set(root.dir=peaDubDee)
 ```
@@ -126,7 +129,7 @@ In evolve and resequence experiments, candidate locii are identified by selectin
 
 PsiSeq (@Earley2011) was a bioinformatic package written for evolve & resequence experiments, being originally applied to food preference in Drosophila sechellia. In particular, it identified two candidate regions on chromosome 2L.
 
-![region of interest identified in Earley 2011](../utils/the_chr2L_anomaly.jpeg)
+![region of interest identified in Earley 2011](the_chr2L_anomaly.jpeg)
 
 
 ## PsiSeq
