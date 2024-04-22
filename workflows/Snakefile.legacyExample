@@ -28,7 +28,9 @@ rule write_report:
 		sequenced_reads_summary=["data/summaries/intermediate/FASTP/all.sequenced_reads.dat"],
 		alignment_summaries = expand("data/summaries/intermediate/BAMs/all.vs_{ref_genome}.{aligner}.summary", ref_genome=['droSim1'], aligner=['bwa','bwaUniq']),
 		psiseq1 = "data/ultimate/shared_SNPs/PsiSeq/droSim1/bwaUniq/Earley2011.SNPs_shared_with.fragSimulated_dSec1.vs_droSim1.bwaUniq.genomeWindowed_w100000_s100000.bed",
-		psiseq2 = "data/ultimate/shared_SNPs/PsiSeq2/dm6/bwaUniq/Earley2011.SNPs_shared_with.fragSimulated_dSim1.vs_droSec1.bwaUniq.lifted_to_dm6.genomeWindowed_w100000_s100000.bed",
+		#psiseq2 = "data/ultimate/shared_SNPs/PsiSeq2/dm6/bwaUniq/Earley2011.SNPs_shared_with.fragSimulated_dSec1.vs_droSim1.bwaUniq.lifted_to_dm6.genomeWindowed_w100000_s100000.bed",
+		psiseq2 = ["data/ultimate/shared_SNPs/PsiSeq2/dm6/bwaUniq/Earley2011.SNPs_shared_with.fragSimulated_dSim1.vs_droSec1.bwaUniq.lifted_to_dm6.genomeWindowed_w100000_s100000.bed"]
+
 	output:
 		pdf_out="results/PsiSeq_legacy_code_example.pdf"
 	params:
@@ -41,7 +43,7 @@ rule write_report:
 		shell(""" mkdir -p results/figures/ results/tables/ """)
 		pandoc_path="/nas/longleaf/apps/rstudio/1.0.136/bin/pandoc"
 		pwd = subprocess.check_output("pwd",shell=True).decode().rstrip()+"/"
-		shell(""" R -e "setwd('{pwd}');Sys.setenv(RSTUDIO_PANDOC='{pandoc_path}')" -e  "peaDubDee='{pwd}'; rmarkdown::render('markdowns/PopPsiSeq_summary.Rmd',output_file='{pwd}{output.pdf_out}')"  """)
+		shell(""" R -e "setwd('{pwd}');Sys.setenv(RSTUDIO_PANDOC='{pandoc_path}')" -e  "peaDubDee='{pwd}'; rmarkdown::render('markdowns/PsiSeq_legacy.Rmd',output_file='{pwd}{output.pdf_out}')"  """)
 
 
 
