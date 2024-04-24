@@ -11,6 +11,9 @@ args = commandArgs(trailingOnly=TRUE)
 grupt_frqs.phial <-args[1]
 frq_shifts.phial <- args[2]
 
+
+options(scipen=999)
+
 #freqCompare.bg <- import.bedGraph(grupt_frqs.phial)
 freqCompare.bg <- import.bedGraph(grupt_frqs.phial)
 names(mcols(freqCompare.bg)) <-  c("score", "name", "blup", "ref", "alt", "parent1_count", "parent1_alt_af", "parent2_count", "parent2_alt_af","offspring_count", "offspring_alt_af")
