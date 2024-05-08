@@ -8,7 +8,7 @@ output:
     toc_depth: 5
     number_sections: true
   html_document: default
-bibliography: references.bib
+bibliography: moehring_references.bib
 ---
 
 ```{r setup, include=FALSE}
@@ -863,7 +863,7 @@ Ten such shuffles were generated per list. The genetic background was generated 
 
 # Results
 
-## ~~PsiSeq Classic~~
+## PsiSeq Classic
 
 ```{r echo=FALSE, warning=FALSE}
 
@@ -968,7 +968,7 @@ all.PsiSeq.shared_with_mauGFP.vs_droSim1.bg <- c(BCM10F.PsiSeq.shared_with_mauGF
 
 ```
 
-```{r echo=FALSE, warning=FALSE, message=FALSE, include=FALSE}
+```{r echo=FALSE, warning=FALSE, message=FALSE, include=TRUE}
 fig_cnt <- fig_cnt + 1
 
 all.PsiSeq.shared_with_simGFP.vs_droSim1.autosomal.bg <- all.PsiSeq.shared_with_simGFP.vs_droSim1.bg[all.PsiSeq.shared_with_simGFP.vs_droSim1.bg@seqnames %in% c('chr2L','chr2R','chr3L','chr3R', "chrX")]
@@ -981,9 +981,9 @@ dev.off()
 
 ```
 
-~~Above is the PsiSeq1 analysis, in which all samples have been compared to simGFP. The vertical axis is the fraction of the sites where the simGFP sample differs from the reference genome, and the sample under analysis also shares this variant allele. As expected, simGFP has a high similarity with itself across the genome, whereas mauritiana and mauritiana backcrosses have low similarity.~~
+Above is the PsiSeq1 analysis, in which all samples have been compared to simGFP. The vertical axis is the fraction of the sites where the simGFP sample differs from the reference genome, and the sample under analysis also shares this variant allele. As expected, simGFP has a high similarity with itself across the genome, whereas mauritiana and mauritiana backcrosses have low similarity.
 
-```{r echo=FALSE, warning=FALSE, message=FALSE, include=FALSE}
+```{r echo=FALSE, warning=FALSE, message=FALSE, include=TRUE}
 
 letters <- c("a","b","c","d","e","f")
 zomes <- c("chr2L","chr2R","chr3L","chr3R","chrX")
@@ -1010,9 +1010,9 @@ dev.off()
 
 ```
 
-~~Here's a closer look, restricted to the 3L chromosome and just the simulans backcrosses. Two features stand out: a region \~8-10Mb where the wild-type backcross has decreased similarity to simGFP, and a region \~15-20 Mb where the needle-eye backcross has decreased similarity relative to the wild-type backcross.~~
+Here's a closer look, restricted to the 3L chromosome and just the simulans backcrosses. Two features stand out: a region \~8-10Mb where the wild-type backcross has decreased similarity to simGFP, and a region \~15-20 Mb where the needle-eye backcross has decreased similarity relative to the wild-type backcross.
 
-```{r echo=FALSE, warning=FALSE, include=FALSE}
+```{r echo=FALSE, warning=FALSE, include=TRUE}
 
 
 
@@ -1041,9 +1041,9 @@ dev.off()
 
 ```
 
-~~Finally, here are the comparisons with both simGFP and mauGFP. It appears that only the second feature near the end of the chromosome arm is the decrease in simulans similarity accompanied by an increase in mauritiana similarity.~~
+Finally, here are the comparisons with both simGFP and mauGFP. It appears that only the second feature near the end of the chromosome arm is the decrease in simulans similarity accompanied by an increase in mauritiana similarity.
 
-## ~~PsiSeq2~~
+## PsiSeq2
 
 ```{r echo=FALSE, warning=FALSE, include=FALSE}
 
@@ -1152,7 +1152,7 @@ all.PsiSeq2.shared_with_mauGFP.vs_droSim1.bg <- c(BCM10F.PsiSeq2.shared_with_mau
 
 ```
 
-```{r echo=FALSE, warning=FALSE, message=FALSE, include=FALSE}
+```{r echo=FALSE, warning=FALSE, message=FALSE, include=TRUE}
 
 
 fig_cnt <- fig_cnt + 1
@@ -1176,7 +1176,7 @@ dev.off()
 
 ```
 
-```{r echo=FALSE, warning=FALSE, message=FALSE, include=FALSE}
+```{r echo=FALSE, warning=FALSE, message=FALSE, include=TRUE}
 
 
 
@@ -1198,11 +1198,11 @@ dev.off()
 
 ```
 
-~~Above is the PsiSeq2 analysis, in which all samples have been compared to simGFP. The vertical axis is the fraction of the sites where the simGFP sample differs from the reference genome, and the sample under analysis also shares this variant allele. As expected, simGFP has a high similarity with itself across the genome, whereas mauritiana the backcrosses' similarity is closer to that of mauGFP. The simulans backcrosses have two distinct behaviors: a "background" in which their similarity is close to that of simGFP, and a "disturbance" on chr3R and intervals on chr2L and chr2R; these generally correspond to similar regions in the PsiSeq1 analysis. As in PsiSeq1, the wild-type backcross is more similar to droSim1 than the needle-eye backcross. What is notable about this analysis is that the backcrosses are actually less similar to droSim1 than mauGFP in the disturbance regions.~~
+Above is the PsiSeq2 analysis, in which all samples have been compared to simGFP. The vertical axis is the fraction of the sites where the simGFP sample differs from the reference genome, and the sample under analysis also shares this variant allele. As expected, simGFP has a high similarity with itself across the genome, whereas mauritiana the backcrosses' similarity is closer to that of mauGFP. The simulans backcrosses have two distinct behaviors: a "background" in which their similarity is close to that of simGFP, and a "disturbance" on chr3R and intervals on chr2L and chr2R; these generally correspond to similar regions in the PsiSeq1 analysis. As in PsiSeq1, the wild-type backcross is more similar to droSim1 than the needle-eye backcross. What is notable about this analysis is that the backcrosses are actually less similar to droSim1 than mauGFP in the disturbance regions.
 
-~~Another feature worth mentioning is the deflection on chr2L, \~13-15Mb. This also appears in PsiSeq1 though it is much less pronounced. This looks very similar to one of the peaks which was originally identified in @Earley2011 as a region of interest re: sechellia and simulans speciation; however on closer inspection its actual origins were murky and although it could well be of interest might not mean what we originally thought.~~
+Another feature worth mentioning is the deflection on chr2L, \~13-15Mb. This also appears in PsiSeq1 though it is much less pronounced. This looks very similar to one of the peaks which was originally identified in @Earley2011 as a region of interest re: sechellia and simulans speciation; however on closer inspection its actual origins were murky and although it could well be of interest might not mean what we originally thought.
 
-```{r echo=FALSE, warning=FALSE, message=FALSE, include=FALSE}
+```{r echo=FALSE, warning=FALSE, message=FALSE, include=TRUE}
 
 
 
@@ -1226,7 +1226,7 @@ dev.off()
 
 ```
 
-```{r echo=FALSE, warning=FALSE, message=FALSE, include=FALSE}
+```{r echo=FALSE, warning=FALSE, message=FALSE, include=TRUE}
 
 
 
@@ -1239,11 +1239,11 @@ png(height =  500, width = 800, filename = paste("results/figures/fig",fig_cnt, 
 
 ```
 
-~~Here's a closer look, restricted to the 3L chromosome and just the simulans backcrosses. As in the PsiSeq1 analysis, there is a region \~15-20 Mb where the needle-eye backcross has decreased similarity relative to the wildtype backcross; however, both backcrosses experience a drop in similarity below that of the mauGFP control.~~
+Here's a closer look, restricted to the 3L chromosome and just the simulans backcrosses. As in the PsiSeq1 analysis, there is a region \~15-20 Mb where the needle-eye backcross has decreased similarity relative to the wildtype backcross; however, both backcrosses experience a drop in similarity below that of the mauGFP control.
 
-~~There is no dramatic deflection in the \~8-10Mb like in the PsiSeq1; however, there is what looks like a local anomaly in the mauGFP genome, where there is an extended interval of heightened similarity to droSim1. This may be causing an artefact in PsiSeq1.~~
+There is no dramatic deflection in the \~8-10Mb like in the PsiSeq1; however, there is what looks like a local anomaly in the mauGFP genome, where there is an extended interval of heightened similarity to droSim1. This may be causing an artefact in PsiSeq1.
 
-```{r echo=FALSE,warning=FALSE, include=FALSE}
+```{r echo=FALSE,warning=FALSE, include=TRUE}
 
 
 
@@ -1268,7 +1268,7 @@ dev.off()
 
 ```
 
-~~The low similarity of the backcrosses to both parental strains are explained by the fact that PsiSeq2 requires high agreement between reads (ie, it requires the sites to be fixed in both parents and the offspring) whereas the classic algorithm would sample stochastically. However, if we look at the fraction of sites which are heterozygous in each sample, there is still considerable heterozygosity in the hybrids and to a lesser extent the simulans F0~~
+The low similarity of the backcrosses to both parental strains are explained by the fact that PsiSeq2 requires high agreement between reads (ie, it requires the sites to be fixed in both parents and the offspring) whereas the classic algorithm would sample stochastically. However, if we look at the fraction of sites which are heterozygous in each sample, there is still considerable heterozygosity in the hybrids and to a lesser extent the simulans F0
 
 ```{r echo=FALSE, warning=FALSE, message=FALSE, include=FALSE}
 
@@ -1296,7 +1296,7 @@ all.vs_droSim1.bwaUniq.het.bg <- het_loader("data/intermediate/population_geneti
 
 ```
 
-```{r echo=FALSE, warning=FALSE, message=FALSE, include=FALSE}
+```{r echo=FALSE, warning=FALSE, message=FALSE, include=TRUE}
 
 
 
@@ -1371,7 +1371,7 @@ thresholds.shared_with_simGFP.vs_droSim1.autosomal.bg <- c(all.PsiSeq2_relaxed.s
 
 ```
 
-```{r echo=FALSE, warning=FALSE, message=FALSE, include=FALSE}
+```{r echo=FALSE, warning=FALSE, message=FALSE, include=TRUE}
 
 autoplot(thresholds.shared_with_simGFP.vs_droSim1.autosomal.bg[thresholds.shared_with_simGFP.vs_droSim1.autosomal.bg@seqnames %in% c("chr3L") & thresholds.shared_with_simGFP.vs_droSim1.autosomal.bg$sample %in% c("BCS10F", "BCS10NE", "mauGFP") ], aes(y=ratio, group = threshold, color = threshold), geom='line') + facet_grid(~sample) + labs(y="Fraction of Sites Shared with SimGFP", title = paste("Figure ", fig_cnt,". Impact of Threshold Parameter on PsiSeq2 Analysis"), subtitle = " 50% vs 90% consensus in SNP calling ", x= "coordinate (droSim1 reference genome)") + theme_clear() #+ theme(axis.text.x = element_text(angle = 90, hjust = 1))
 
@@ -2204,7 +2204,7 @@ all.with_sim_and_mau.vs_prinDsim3.bwaUniq.smrtFB.maleExpressionOnX_l10k.resample
 fig_cnt <- fig_cnt + 1 
 
 
-all.with_sim_and_mau.vs_prinDsim3.bwaUniq.smrtFB.maleExpressionOnX_l10k.shuffled_controls.frqShift.chonkt.gg <- ggplot() + geom_linerange(data = all.with_sim_and_mau.vs_prinDsim3.bwaUniq.smrtFB.maleExpressionOnX_l10k.shuffled_controls.frqShift.chonkt.bg, aes(x=subgroup, ymin = avg - 2*std, ymax = avg + 2*std, group = rep), position = position_dodge(width = 0.5), alpha =0.75) + geom_point(data = all.with_sim_and_mau.vs_prinDsim3.bwaUniq.smrtFB.maleExpressionOnX_l10k.frqShift.bg , aes(y=avg_sim_deltaF, x=subgroup, color = subgroup)) + labs(y="AF Shift (towards simGFP)", title = paste("Figure ", fig_cnt,". Allele Frequency Shift for Genes of Interest", sep = ""), subtitle = "curated list of genes on the X with expression in male sex tissue", x= "", caption = "with 10 replicates of shuffled non-overlapping, same-size intervals") + theme_clear() + theme(axis.text.x = element_text(angle = 30, hjust = 1))  + coord_cartesian(ylim = c(-1,0.5))
+all.with_sim_and_mau.vs_prinDsim3.bwaUniq.smrtFB.maleExpressionOnX_l10k.shuffled_controls.frqShift.chonkt.gg <- ggplot() + geom_linerange(data = all.with_sim_and_mau.vs_prinDsim3.bwaUniq.smrtFB.maleExpressionOnX_l10k.shuffled_controls.frqShift.chonkt.bg, aes(x=subgroup, ymin = avg - 2*std, ymax = avg + 2*std, group = rep), position = position_dodge(width = 0.5), alpha =0.75) + geom_point(data = all.with_sim_and_mau.vs_prinDsim3.bwaUniq.smrtFB.maleExpressionOnX_l10k.shuffled_controls.frqShift.chonkt.bg, aes(x=subgroup, y = avg, group = rep), position = position_dodge(width = 0.5), alpha =0.75, color = "black", shape=1) + geom_point(data = all.with_sim_and_mau.vs_prinDsim3.bwaUniq.smrtFB.maleExpressionOnX_l10k.frqShift.bg , aes(y=avg_sim_deltaF, x=subgroup, color = subgroup), position = position_jitter(width = 0.25, height = 0)) + labs(y="AF Shift (towards simGFP)", title = paste("Figure ", fig_cnt,". Allele Frequency Shift for Genes of Interest", sep = ""), subtitle = "curated list of genes on the X with expression in male sex tissue", x= "", caption = "with 10 replicates of shuffled non-overlapping, same-size intervals") + theme_clear() + theme(axis.text.x = element_text(angle = 30, hjust = 1))  + coord_cartesian(ylim = c(-1,0.5))
 
 all.with_sim_and_mau.vs_prinDsim3.bwaUniq.smrtFB.maleExpressionOnX_l10k.shuffled_controls.frqShift.chonkt.gg
 
@@ -2223,8 +2223,7 @@ dev.off()
 
 
 
-
-all.with_sim_and_mau.vs_prinDsim3.bwaUniq.smrtFB.maleExpressionOnX_l10k.shuffled_controls.frqShift.chonkt.pretty4pub.gg <- ggplot() + geom_linerange(data = all.with_sim_and_mau.vs_prinDsim3.bwaUniq.smrtFB.maleExpressionOnX_l10k.shuffled_controls.frqShift.chonkt.bg %>% mutate(subgroup = case_match(subgroup, "simulans" ~ "simGFP", "mauritiana" ~"mauGFP", "simBackcrossNormal" ~"BCS10WT", "simBackcrossMutant"~"BCS10NE", "mauBackcrossNormal"~"BCM10WT", "mauBackcrossMutant"~"BCM10NE")), aes(x=subgroup, ymin = avg - 2*std, ymax = avg + 2*std, group = rep), position = position_dodge(width = 0.5),color = "black", alpha =0.6) + geom_point(data = all.with_sim_and_mau.vs_prinDsim3.bwaUniq.smrtFB.maleExpressionOnX_l10k.frqShift.bg %>% mutate(subgroup = case_match(subgroup, "simulans" ~ "simGFP", "mauritiana" ~"mauGFP", "simBackcrossNormal" ~"BCS10WT", "simBackcrossMutant"~"BCS10NE", "mauBackcrossNormal"~"BCM10WT", "mauBackcrossMutant"~"BCM10NE")) , aes(y=avg_sim_deltaF, x=subgroup), color = "black") + labs(y="AF Shift (towards simGFP)", title = paste("Figure ", fig_cnt,". Allele Frequency Shift for Genes of Interest", sep = ""), subtitle = "curated list of genes on the X with expression in male sex tissue", x= "", caption = "with 10 replicates of shuffled non-overlapping, same-size intervals") + theme_clear() + theme(axis.text.x = element_text(angle = 30, hjust = 1))  + coord_cartesian(ylim = c(-1,0.5))
+all.with_sim_and_mau.vs_prinDsim3.bwaUniq.smrtFB.maleExpressionOnX_l10k.shuffled_controls.frqShift.chonkt.pretty4pub.gg <- ggplot() + geom_linerange(data = all.with_sim_and_mau.vs_prinDsim3.bwaUniq.smrtFB.maleExpressionOnX_l10k.shuffled_controls.frqShift.chonkt.bg %>% mutate(subgroup = case_match(subgroup, "simulans" ~ "simGFP", "mauritiana" ~"mauGFP", "simBackcrossNormal" ~"BCS10WT", "simBackcrossMutant"~"BCS10NE", "mauBackcrossNormal"~"BCM10WT", "mauBackcrossMutant"~"BCM10NE")), aes(x=subgroup, ymin = avg - 2*std, ymax = avg + 2*std, group = rep), position = position_dodge(width = 0.5),color = "black", alpha =0.6) + geom_point(data = all.with_sim_and_mau.vs_prinDsim3.bwaUniq.smrtFB.maleExpressionOnX_l10k.shuffled_controls.frqShift.chonkt.bg %>% mutate(subgroup = case_match(subgroup, "simulans" ~ "simGFP", "mauritiana" ~"mauGFP", "simBackcrossNormal" ~"BCS10WT", "simBackcrossMutant"~"BCS10NE", "mauBackcrossNormal"~"BCM10WT", "mauBackcrossMutant"~"BCM10NE")), aes(x=subgroup, y = avg, group = rep), position = position_dodge(width = 0.5), alpha =0.75, color = "black", shape=1) + geom_point(data = all.with_sim_and_mau.vs_prinDsim3.bwaUniq.smrtFB.maleExpressionOnX_l10k.frqShift.bg %>% mutate(subgroup = case_match(subgroup, "simulans" ~ "simGFP", "mauritiana" ~"mauGFP", "simBackcrossNormal" ~"BCS10WT", "simBackcrossMutant"~"BCS10NE", "mauBackcrossNormal"~"BCM10WT", "mauBackcrossMutant"~"BCM10NE")) , aes(y=avg_sim_deltaF, x=subgroup), color = "black", position = position_jitter(width = 0.1, height = 0)) + labs(y="AF Shift (towards simGFP)", title = paste("Figure ", fig_cnt,". Allele Frequency Shift for Genes of Interest", sep = ""), subtitle = "curated list of genes on the X with expression in male sex tissue", x= "", caption = "with 10 replicates of shuffled non-overlapping, same-size intervals") + theme_clear() + theme(axis.text.x = element_text(angle = 30, hjust = 1))  + coord_cartesian(ylim = c(-1,0.5))
 
 all.with_sim_and_mau.vs_prinDsim3.bwaUniq.smrtFB.maleExpressionOnX_l10k.shuffled_controls.frqShift.chonkt.pretty4pub.gg
 
@@ -2246,7 +2245,7 @@ dev.off()
 #fig_cnt <- fig_cnt + 1 
 
 
-all.with_sim_and_mau.vs_prinDsim3.bwaUniq.smrtFB.maleExpressionOnX_l10k.resampled_controls.frqShift.chonkt.gg <- ggplot() + geom_linerange(data = all.with_sim_and_mau.vs_prinDsim3.bwaUniq.smrtFB.maleExpressionOnX_l10k.resampled_controls.frqShift.chonkt.bg, aes(x=subgroup, ymin = avg - 2*std, ymax = avg + 2*std, group = rep), position = position_dodge(width = 0.5), alpha =0.75) + geom_point(data = all.with_sim_and_mau.vs_prinDsim3.bwaUniq.smrtFB.maleExpressionOnX_l10k.frqShift.bg , aes(y=avg_sim_deltaF, x=subgroup, color = subgroup)) + labs(y="AF Shift (towards simGFP)", title = paste("Figure ", fig_cnt,". Allele Frequency Shift for Genes of Interest", sep = ""), subtitle = "curated list of genes on the X with expression in male sex tissue", x= "", caption = "with 10 replicates of resampled genes from annotation") + theme_clear() + theme(axis.text.x = element_text(angle = 30, hjust = 1))  + coord_cartesian(ylim = c(-1,0.5))
+all.with_sim_and_mau.vs_prinDsim3.bwaUniq.smrtFB.maleExpressionOnX_l10k.resampled_controls.frqShift.chonkt.gg <- ggplot() + geom_linerange(data = all.with_sim_and_mau.vs_prinDsim3.bwaUniq.smrtFB.maleExpressionOnX_l10k.resampled_controls.frqShift.chonkt.bg, aes(x=subgroup, ymin = avg - 2*std, ymax = avg + 2*std, group = rep), position = position_dodge(width = 0.5), alpha =0.75)+ geom_point(data = all.with_sim_and_mau.vs_prinDsim3.bwaUniq.smrtFB.maleExpressionOnX_l10k.resampled_controls.frqShift.chonkt.bg, aes(x=subgroup, y = avg , group = rep), position = position_dodge(width = 0.5), alpha =0.75, shape=1, color = "black") + geom_point(data = all.with_sim_and_mau.vs_prinDsim3.bwaUniq.smrtFB.maleExpressionOnX_l10k.frqShift.bg , aes(y=avg_sim_deltaF, x=subgroup, color = subgroup), position = position_jitter(width = 0.1, height = 0)) + labs(y="AF Shift (towards simGFP)", title = paste("Figure ", fig_cnt,". Allele Frequency Shift for Genes of Interest", sep = ""), subtitle = "curated list of genes on the X with expression in male sex tissue", x= "", caption = "with 10 replicates of resampled genes from annotation") + theme_clear() + theme(axis.text.x = element_text(angle = 30, hjust = 1))  + coord_cartesian(ylim = c(-1,0.5))
 
 all.with_sim_and_mau.vs_prinDsim3.bwaUniq.smrtFB.maleExpressionOnX_l10k.resampled_controls.frqShift.chonkt.gg
 
@@ -2265,7 +2264,7 @@ dev.off()
 #fig_cnt <- fig_cnt + 1 
 
 
-all.with_sim_and_mau.vs_prinDsim3.bwaUniq.smrtFB.maleExpressionOnX_l10k.resampled_controls.frqShift.chonkt.pretty4pub.gg <- ggplot() + geom_linerange(data = all.with_sim_and_mau.vs_prinDsim3.bwaUniq.smrtFB.maleExpressionOnX_l10k.resampled_controls.frqShift.chonkt.bg %>% mutate(subgroup = case_match(subgroup, "simulans" ~ "simGFP", "mauritiana" ~"mauGFP", "simBackcrossNormal" ~"BCS10WT", "simBackcrossMutant"~"BCS10NE", "mauBackcrossNormal"~"BCM10WT", "mauBackcrossMutant"~"BCM10NE")), aes(x=subgroup, ymin = avg - 2*std, ymax = avg + 2*std, group = rep), position = position_dodge(width = 0.5), color = "black", alpha =0.6) + geom_point(data = all.with_sim_and_mau.vs_prinDsim3.bwaUniq.smrtFB.maleExpressionOnX_l10k.frqShift.bg %>% mutate(subgroup = case_match(subgroup, "simulans" ~ "simGFP", "mauritiana" ~"mauGFP", "simBackcrossNormal" ~"BCS10WT", "simBackcrossMutant"~"BCS10NE", "mauBackcrossNormal"~"BCM10WT", "mauBackcrossMutant"~"BCM10NE")), aes(y=avg_sim_deltaF, x=subgroup), color = "black") + labs(y="AF Shift (towards simGFP)", title = paste("Figure ", fig_cnt,". Allele Frequency Shift for Genes of Interest", sep = ""), subtitle = "curated list of genes on the X with expression in male sex tissue", x= "", caption = "with 10 replicates of resampled genes from annotation") + theme_clear() + theme(axis.text.x = element_text(angle = 30, hjust = 1))  + coord_cartesian(ylim = c(-1,0.5))
+all.with_sim_and_mau.vs_prinDsim3.bwaUniq.smrtFB.maleExpressionOnX_l10k.resampled_controls.frqShift.chonkt.pretty4pub.gg <- ggplot() + geom_linerange(data = all.with_sim_and_mau.vs_prinDsim3.bwaUniq.smrtFB.maleExpressionOnX_l10k.resampled_controls.frqShift.chonkt.bg %>% mutate(subgroup = case_match(subgroup, "simulans" ~ "simGFP", "mauritiana" ~"mauGFP", "simBackcrossNormal" ~"BCS10WT", "simBackcrossMutant"~"BCS10NE", "mauBackcrossNormal"~"BCM10WT", "mauBackcrossMutant"~"BCM10NE")), aes(x=subgroup, ymin = avg - 2*std, ymax = avg + 2*std, group = rep), position = position_dodge(width = 0.5), color = "black", alpha =0.6) + geom_point(data = all.with_sim_and_mau.vs_prinDsim3.bwaUniq.smrtFB.maleExpressionOnX_l10k.resampled_controls.frqShift.chonkt.bg %>% mutate(subgroup = case_match(subgroup, "simulans" ~ "simGFP", "mauritiana" ~"mauGFP", "simBackcrossNormal" ~"BCS10WT", "simBackcrossMutant"~"BCS10NE", "mauBackcrossNormal"~"BCM10WT", "mauBackcrossMutant"~"BCM10NE")), aes(x=subgroup, y = avg, group = rep), position = position_dodge(width = 0.5), color = "black", alpha =0.6, shape = 1) + geom_point(data = all.with_sim_and_mau.vs_prinDsim3.bwaUniq.smrtFB.maleExpressionOnX_l10k.frqShift.bg %>% mutate(subgroup = case_match(subgroup, "simulans" ~ "simGFP", "mauritiana" ~"mauGFP", "simBackcrossNormal" ~"BCS10WT", "simBackcrossMutant"~"BCS10NE", "mauBackcrossNormal"~"BCM10WT", "mauBackcrossMutant"~"BCM10NE")), aes(y=avg_sim_deltaF, x=subgroup), position = position_jitter(width = 0.1, height = 0), color = "black") + labs(y="AF Shift (towards simGFP)", title = paste("Figure ", fig_cnt,". Allele Frequency Shift for Genes of Interest", sep = ""), subtitle = "curated list of genes on the X with expression in male sex tissue", x= "", caption = "with 10 replicates of resampled genes from annotation") + theme_clear() + theme(axis.text.x = element_text(angle = 30, hjust = 1))  + coord_cartesian(ylim = c(-1,0.5))
 
 all.with_sim_and_mau.vs_prinDsim3.bwaUniq.smrtFB.maleExpressionOnX_l10k.resampled_controls.frqShift.chonkt.pretty4pub.gg
 

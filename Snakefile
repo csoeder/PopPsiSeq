@@ -286,7 +286,8 @@ rule bam_reporter:
 	input:
 		bam_in = "data/intermediate/mapped_reads/{aligner}/{sample}.vs_{ref_genome}.{aligner}.sort.bam"
 	output:
-		report_out = "data/summaries/intermediate/BAMs/{aligner}/{sample}.vs_{ref_genome}.{aligner}.summary"
+		report_out = "data/summaries/intermediate/BAMs/{aligner}/{sample}.vs_{ref_genome}.{aligner}.summary",
+		dpth_by_chrom = "data/intermediate/mapped_reads/{aligner}/{sample}.vs_{ref_genome}.{aligner}.sort.bam.dpth_by_chrom",
 	params:
 		runmem_gb=8,
 		runtime="4:00:00",
@@ -301,16 +302,36 @@ rule bam_reporter:
 		shell("bedtools genomecov -max 1 -ibam {input.bam_in} -g {ref_genome_idx} > {input.bam_in}.genomcov")
 		#change the -max flag as needed to set 
 		shell("""samtools depth -a {input.bam_in} | awk '{{sum+=$3; sumsq+=$3*$3}} END {{ print "average_depth\t",sum/NR; print "std_depth\t",sqrt(sumsq/NR - (sum/NR)**2)}}' > {input.bam_in}.dpthStats""")
+
+
+		shell("""samtools depth -a {input.bam_in}  > {input.bam_in}.dpth.tmp """)
+                shell(""" 
+                rm -rf {input.bam_in}.dpth_by_chrom;
+                for chrom in $(cat {ref_genome_idx} | cut -f 1); do 
+                cat {input.bam_in}.dpth.tmp | grep -w "$chrom" | awk '{{sum+=$3; sumsq+=$3*$3}} END {{ print "average_depth\t",sum/NR; print "std_depth\t",sqrt(sumsq/NR - (sum/NR)**2)}}' | awk -v chr="$chrom" '{{print"{wildcards.sample}\t"chr"\t"$0}}' >>  {input.bam_in}.dpth_by_chrom ; 
+                done  """)
+
+                shell("""rm {input.bam_in}.dpth.tmp """)
+
+
+
 		#https://www.biostars.org/p/5165/
 		#save the depth file and offload the statistics to the bam_summarizer script?? 
 		shell("python3 scripts/bam_summarizer.py -f {input.bam_in}.flagstat -i {input.bam_in}.idxstats -g {input.bam_in}.genomcov -d {input.bam_in}.dpthStats -o {output.report_out} -t {wildcards.sample}")
 
+
+
+
 rule demand_BAM_analytics:
 	input:
-		bam_reports = lambda wildcards: expand("data/summaries/intermediate/BAMs/{aligner}/{sample}.vs_{ref_genome}.{aligner}.summary", sample=sampname_by_group[wildcards.group], ref_genome=wildcards.ref_genome, aligner=wildcards.aligner)
+		bam_reports = lambda wildcards: expand("data/summaries/intermediate/BAMs/{aligner}/{sample}.vs_{ref_genome}.{aligner}.summary", sample=sampname_by_group[wildcards.group], ref_genome=wildcards.ref_genome, aligner=wildcards.aligner),
+                dpth_reports = lambda wildcards: expand("data/intermediate/mapped_reads/{aligner}/{sample}.vs_{ref_genome}.{aligner}.sort.bam.dpth_by_chrom", sample=sampname_by_group[wildcards.group], ref_genome=wildcards.ref_genome, aligner=wildcards.aligner),
+
 	output:
 #		full_report = "data/summaries/intermediate/BAMs/{group}.vs_{ref_genome}.{aligner}.summary"
-		full_report = "data/summaries/intermediate/BAMs/{group, \w+}.vs_{ref_genome}.{aligner}.summary"
+		full_report = "data/summaries/intermediate/BAMs/{group, \w+}.vs_{ref_genome}.{aligner}.summary",
+		all_dpth_by_chrom = "data/summaries/intermediate/BAMs/{group, \w+}.vs_{ref_genome}.{aligner}.dpth_by_chrom"
+
 	params:
 		runmem_gb=1,
 		runtime="1:00",
@@ -318,7 +339,7 @@ rule demand_BAM_analytics:
 	message:
 		"collecting all alignment metadata.... "
 	shell:
-		"cat {input.bam_reports} > {output.full_report}"
+		"cat {input.bam_reports} > {output.full_report}; cat {input.dpth_reports} > {output.all_dpth_by_chrom}"
 
 
 ############################################################################  
@@ -329,7 +350,7 @@ rule demand_BAM_analytics:
 rule joint_vcf_caller_parallel:
 	input:
 		bams_in = lambda wildcards: expand("data/intermediate/mapped_reads/{aligner}/{sample}.vs_{ref_genome}.{aligner}.sort.bam", sample=sampname_by_group[wildcards.group], ref_genome=wildcards.ref_genome, aligner=wildcards.aligner),
-		windows_in = "utils/genome_windows/{ref_genome}_w100000_s100000.windows.bed"
+		windows_in = "utils/genome_windows/{ref_genome}_w100000_s100000.windows.list"
 	output:
 		vcf_out = "data/intermediate/variants/freebayes/{group}.vs_{ref_genome}.{aligner}.vcf"
 	params:
@@ -341,8 +362,8 @@ rule joint_vcf_caller_parallel:
 		"Using Freebayes to jointly call variants from all samples mapped to \ {wildcards.ref_genome} \ with \ {wildcards.aligner} \ "
 	run:
 		ref_genome_file=ref_genome_by_name[wildcards.ref_genome]['path']
-		shell("""cat {input.windows_in}| awk '{{print$1":"$2"-"$3}}' > {input.windows_in}.rfmt""")
-		shell("scripts/freebayes-parallel {input.windows_in}.rfmt {params.cores} {params.freebayes} -f {ref_genome_file} {input.bams_in} | vcftools --remove-indels --vcf - --recode --recode-INFO-all --stdout  > {output.vcf_out} ")
+		
+		shell("scripts/freebayes-parallel {input.windows_in} {params.cores} {params.freebayes} -f {ref_genome_file} {input.bams_in} | vcftools --remove-indels --vcf - --recode --recode-INFO-all --stdout  > {output.vcf_out} ")
 
 
 rule vcf_reporter: # replace this with the better reporter for freebayesSmrt?
@@ -422,7 +443,9 @@ rule subset_VCF_to_subgroup: # does this work with freebayesSmrt?
 
 rule window_maker:
 	output:
-		windowed='utils/genome_windows/{ref_genome}_w{window_size}_s{slide_rate}.windows.bed'
+		windowed='utils/genome_windows/{ref_genome}_w{window_size}_s{slide_rate}.windows.bed',
+		winlist='utils/genome_windows/{ref_genome}_w{window_size}_s{slide_rate}.windows.list',
+
 	params:
 		runmem_gb=8,
 		runtime="5:00",
@@ -433,7 +456,7 @@ rule window_maker:
 		shell(
 			'bedtools makewindows -w {wildcards.window_size} -s {wildcards.slide_rate} -g {fai_path} -i winnum | bedtools sort -i - > {output.windowed}'
 		)
-
+		shell("""cat {output.windowed}| awk '{{print$1":"$2"-"$3}}' > {output.winlist}""")
 
 ############################################################################  
 #######		windowed frequency comparison between groups 	################
@@ -537,34 +560,5 @@ rule DAGnabbit:
 		shell("""rm -rf {output.dag_nabbed};  mkdir -p meta/pipeline_schematics/{wildcards.path_prefix}/ """)
 
 		shell(""" snakemake --rulegraph {input.target} | dot -T png > {output.dag_nabbed} """)
-
-
-# rule write_report:
-	# input:
-		# reference_genome_summary = ["meta/reference_genomes.summary"],
-		# sequenced_reads_summary=["meta/sequenced_reads.dat"],
-		# alignment_summaries = expand("meta/alignments.vs_{ref_genome}.{aligner}.summary", ref_genome=['droSim1', 'droSec1'], aligner=['bwa','bwaUniq']),
-		# full_variant_summary = expand("meta/{prefix}.calledVariants.{aligner}.summary", aligner=["bwaUniq"], prefix=["all_samples"] ),
-		# windowed_frq_shifts = expand("variant_analysis/freqShift/all_samples.{treat}_with_PopSec_and_PopSim.vs_droSim1.bwaUniq.windowed_w100000_s100000.frqShift", treat = ['selection','control']),
-		# distances = expand("variants/all_samples.vs_{ref_genome}.bwaUniq/distances/from.all.to.all.{ref_genome}_w100000_s100000.distanceRoster",ref_genome=['droSim1', 'droSec1']),
-	# output:
-		# pdf_out="thingy.pdf"
-	# params:
-		# runmem_gb=8,
-		# runtime="1:00:00",
-		# cores=2,
-	# message:
-		# "writing up the results.... "
-	# run:
-		# pandoc_path="/nas/longleaf/apps/rstudio/1.0.136/bin/pandoc"
-		# pwd = subprocess.check_output("pwd",shell=True).decode().rstrip()+"/"
-		# shell(""" R -e "setwd('{pwd}');Sys.setenv(RSTUDIO_PANDOC='{pandoc_path}')" -e  "peaDubDee='{pwd}'; rmarkdown::render('scripts/PopPsiSeq_summary.Rmd',output_file='{pwd}{output.pdf_out}')"  """)
-# #		shell(""" R -e "setwd('{pwd}/');" -e Sys.setenv"(RSTUDIO_PANDOC='{pandoc_path}')" -e  rmarkdown::render"('scripts/PopPsiSeq_summary.Rmd',output_file='{output.pdf_out}')"  """)
-# #		shell(""" R -e Sys.setenv"(RSTUDIO_PANDOC='{pandoc_path}')" -e  "thetitle='My title'; theauthor='me'; rmarkdown::render('scripts/PopPsiSeq_summary.Rmd',output_file='{output.pdf_out}')"  """)
-# #		shell(""" cp scripts/{output.pdf_out} {output.pdf_out} """)
-# #pandoc_path="/nas/longleaf/apps/rstudio/1.0.136/bin/pandoc"
-# #R -e Sys.setenv"(RSTUDIO_PANDOC='$pandoc_path')" -e  rmarkdown::render"('$markDown_in',output_file='$pdf_Out')"
-# #R -e "setwd('/proj/cdjones_lab/csoeder/PopPsiSeq')" -e Sys.setenv"(RSTUDIO_PANDOC='$pandoc_path')" -e  rmarkdown::render"('scripts/PopPsiSeq_summary.Rmd',output_file='test.pdf')"
-
 
 
