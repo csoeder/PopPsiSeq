@@ -1,5 +1,5 @@
-include: "Snakefile.legacy"
-include: "Snakefile.popgentools"
+include: "../utils/modules/Snakefile.legacy"
+include: "../utils/modules/Snakefile.popgentools"
 
 annotation_by_name = { a['name'] : a for a in config['annotations']}
 

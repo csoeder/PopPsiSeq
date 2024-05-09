@@ -1,0 +1,111 @@
+include: "../utils/modules/Snakefile.legacy"
+include: "../utils/modules/Snakefile.popgentools"
+
+annotation_by_name = { a['name'] : a for a in config['annotations']}
+
+
+############################################################################  
+#######		writeup	and timestamp ####
+############################################################################  
+
+
+rule all:
+	input: 
+		pdf_out="results/Moehring_PopPsiSeq.pdf",
+	params:
+		runmem_gb=1,
+		runtime="0:01:00",
+		cores=1,
+	run:
+		shell(""" mkdir -p results/figures/; touch results/figures/null.png; for fig in results/figures/*png; do mv $fig $(echo $fig| rev | cut -f 2- -d . | rev ).$(date +%d_%b_%Y).png; done;  rm results/figures/null.*.png; """)
+		shell(""" mkdir -p results/figures/supp/ ; touch results/figures/supp/null.png; for fig in results/figures/supp/*png; do mv $fig $(echo $fig| rev | cut -f 2- -d . | rev ).$(date +%d_%b_%Y).png; done; rm results/figures/supp/null.*.png; """)
+
+		shell(""" mkdir -p results/tables/ ; touch results/tables/null.tmp ; for phial in $(ls -p results/tables/ | grep -v /); do pre=$(echo $phial | rev | cut -f 2- -d . | rev ); suff=$(echo $phial | rev | cut -f 1 -d . | rev ); mv results/tables/$phial results/tables/$pre.$(date +%d_%b_%Y).$suff; done ; rm results/tables/null.*.tmp; """)
+		shell(""" mkdir -p results/tables/supp/ ; touch results/tables/supp/null.tmp ; for phial in $(ls -p results/tables/supp/ | grep -v /); do pre=$(echo $phial | rev | cut -f 2- -d . | rev ); suff=$(echo $phial | rev | cut -f 1 -d . | rev ); mv results/tables/supp/$phial results/tables/supp/$pre.$(date +%d_%b_%Y).$suff; done ; rm results/tables/supp/null.*.tmp; """)
+
+		shell(""" mv results/Moehring_PopPsiSeq.pdf results/Moehring_PopPsiSeq.$(date +%d_%b_%Y).pdf """)
+		shell(""" tar cf Moehring_PopPsiSeq.$(date +%d_%b_%Y).tar results/ """)
+
+
+rule write_report:
+	input:
+		reference_summary = ["data/summaries/reference_genomes/reference_genomes.summary", "data/summaries/reference_annotations/reference_annotations.summary"],
+		sequenced_reads_summary=["data/summaries/intermediate/FASTP/all.sequenced_reads.dat"],
+		alignment_summaries = expand("data/summaries/intermediate/BAMs/all.vs_{ref_gen}.{aligner}.summary", ref_gen=['droSim1', 'ncbiMau','prinDsim3'], aligner=['bwa','bwaUniq']),
+		dpth_by_chr= "data/summaries/intermediate/BAMs/all.vs_droSim1.bwaUniq.dpth_by_chrom",
+		vcf_summaries = ["data/summaries/intermediate/VCFs/all.calledVariants.bwaUniq.summary"],
+
+		#PsiSeq_legacy = expand("data/ultimate/shared_SNPs/PsiSeq{version}/droSim1/bwaUniq/{sample_1}.SNPs_shared_with.{sample_2}.vs_droSim1.bwaUniq.genomeWindowed_w100000_s50000.bed", sample_1 = ["BCM10F", "BCM10NE", "BCS10F", "BCS10NE", "mauGFP", "simGFP"], sample_2 = ["BCM10F", "BCM10NE", "BCS10F", "BCS10NE", "mauGFP", "simGFP"], version = ["","2", "2_relaxed"]),
+
+		std_freebayes_bin = expand("data/ultimate/freq_shift/freebayes/all.{sample}_with_simulans_and_mauritiana.vs_droSim1.bwaUniq.snpBinned_{bins}.frqShift.bed", sample = ["simBackcrossMutant","simBackcrossNormal","mauritiana"], bins = ["b120_s60", "b12500_s6250", "b1250_s625"]),
+		std_freebayes_winSize = expand("data/ultimate/freq_shift/freebayes/all.{sample}_with_simulans_and_mauritiana.vs_droSim1.bwaUniq.windowed_{wins}.frqShift.bed", sample = ["simBackcrossMutant","simBackcrossNormal","mauritiana"], wins = ["w10000_s5000","w1000000_s500000"]),
+		std_freebayes = expand("data/ultimate/freq_shift/freebayes/all.{sample}_with_simulans_and_mauritiana.vs_droSim1.bwaUniq.windowed_w100000_s50000.frqShift.bed", sample = ["mauBackcrossMutant","mauBackcrossNormal","mauritiana","mauritianaBackcross","mutantSperm","normalSperm","simBackcrossMutant","simBackcrossNormal","simulans","simulansBackcross"]),
+		smrt_freebayes = expand("data/ultimate/freq_shift/smrtFreeBayes/all.{sample}_with_simulans_and_mauritiana.vs_{ref_genome}.bwaUniq.windowed_w100000_s50000.frqShift.bed", sample = ["mauBackcrossMutant","mauBackcrossNormal","mauritiana","mauritianaBackcross","mutantSperm","normalSperm","simBackcrossMutant","simBackcrossNormal","simulans","simulansBackcross"], ref_genome = ["prinDsim3", "droSim1"]),
+
+		gene_list = expand("data/ultimate/freq_shift/smrtFreeBayes/all.{sample}_with_simulans_and_mauritiana.vs_{ref_genome}.bwaUniq.maleExpressionOnX_listWindowed_l10000.frqShift.bed", sample = ["mauBackcrossMutant","mauBackcrossNormal","mauritiana","simBackcrossMutant","simBackcrossNormal","simulans"], ref_genome = ["prinDsim3"]),
+		gene_list_cntrl = expand("data/ultimate/freq_shift/smrtFreeBayes/all.{sample}_with_simulans_and_mauritiana.vs_{ref_genome}.bwaUniq.maleExpressionOnX_listWindowed_l10000_{mode}{rep}.frqShift.bed", sample = ["mauBackcrossMutant","mauBackcrossNormal","mauritiana","simBackcrossMutant","simBackcrossNormal","simulans"], ref_genome = ["prinDsim3"], mode = ["f","m"], rep = range(0,10)),    
+
+		popgen = ["data/intermediate/population_genetics/heterozygosity/freebayes/all.vs_droSim1.bwaUniq.het.w100000_s50000.bg"],
+
+
+
+
+	output:
+		pdf_out="results/Moehring_PopPsiSeq.pdf"
+	params:
+		runmem_gb=8,
+		runtime="1:00:00",
+		cores=2,
+	message:
+		"writing up the results.... "
+	run:
+		pandoc_path="/nas/longleaf/apps/rstudio/2021.09.2-382/bin/pandoc"
+		pwd = subprocess.check_output("pwd",shell=True).decode().rstrip()+"/"
+		shell("""mkdir -p results/figures/supp/ results/tables/supp/""")
+		shell(""" R -e "setwd('{pwd}');Sys.setenv(RSTUDIO_PANDOC='{pandoc_path}')" -e  "peaDubDee='{pwd}'; rmarkdown::render('workflows/Moehring_PopPsiSeq.Rmd',output_file='{pwd}{output.pdf_out}')"  """)
+
+
+
+
+rule write_dev_report:
+	input:
+		reference_summary = ["data/summaries/reference_genomes/reference_genomes.summary", "data/summaries/reference_annotations/reference_annotations.summary"],
+		sequenced_reads_summary=["data/summaries/intermediate/FASTP/all.sequenced_reads.dat"],
+		alignment_summaries = expand("data/summaries/intermediate/BAMs/all.vs_{ref_gen}.{aligner}.summary", ref_gen=['droSim1', 'ncbiMau','prinDsim3'], aligner=['bwa','bwaUniq']),
+		dpth_by_chr= "data/summaries/intermediate/BAMs/all.vs_droSim1.bwaUniq.dpth_by_chrom",
+		vcf_summaries = ["data/summaries/intermediate/VCFs/all.calledVariants.bwaUniq.summary"],
+
+		PsiSeq_legacy = expand("data/ultimate/shared_SNPs/PsiSeq{version}/droSim1/bwaUniq/{sample_1}.SNPs_shared_with.{sample_2}.vs_droSim1.bwaUniq.genomeWindowed_w100000_s50000.bed", sample_1 = ["BCM10F", "BCM10NE", "BCS10F", "BCS10NE", "mauGFP", "simGFP"], sample_2 = ["BCM10F", "BCM10NE", "BCS10F", "BCS10NE", "mauGFP", "simGFP"], version = ["","2", "2_relaxed"]),
+
+		std_freebayes_bin = expand("data/ultimate/freq_shift/freebayes/all.{sample}_with_simulans_and_mauritiana.vs_droSim1.bwaUniq.snpBinned_{bins}.frqShift.bed", sample = ["simBackcrossMutant","simBackcrossNormal","mauritiana"], bins = ["b120_s60", "b12500_s6250", "b1250_s625"]),
+		std_freebayes_winSize = expand("data/ultimate/freq_shift/freebayes/all.{sample}_with_simulans_and_mauritiana.vs_droSim1.bwaUniq.windowed_{wins}.frqShift.bed", sample = ["simBackcrossMutant","simBackcrossNormal","mauritiana"], wins = ["w10000_s5000","w1000000_s500000"]),
+		std_freebayes = expand("data/ultimate/freq_shift/freebayes/all.{sample}_with_simulans_and_mauritiana.vs_droSim1.bwaUniq.windowed_w100000_s50000.frqShift.bed", sample = ["mauBackcrossMutant","mauBackcrossNormal","mauritiana","mauritianaBackcross","mutantSperm","normalSperm","simBackcrossMutant","simBackcrossNormal","simulans","simulansBackcross"]),
+		smrt_freebayes = expand("data/ultimate/freq_shift/smrtFreeBayes/all.{sample}_with_simulans_and_mauritiana.vs_{ref_genome}.bwaUniq.windowed_w100000_s50000.frqShift.bed", sample = ["mauBackcrossMutant","mauBackcrossNormal","mauritiana","mauritianaBackcross","mutantSperm","normalSperm","simBackcrossMutant","simBackcrossNormal","simulans","simulansBackcross"], ref_genome = ["prinDsim3", "droSim1"]),
+
+		gene_list = expand("data/ultimate/freq_shift/smrtFreeBayes/all.{sample}_with_simulans_and_mauritiana.vs_{ref_genome}.bwaUniq.maleExpressionOnX_listWindowed_l10000.frqShift.bed", sample = ["mauBackcrossMutant","mauBackcrossNormal","mauritiana","simBackcrossMutant","simBackcrossNormal","simulans"], ref_genome = ["prinDsim3"]),
+		gene_list_cntrl = expand("data/ultimate/freq_shift/smrtFreeBayes/all.{sample}_with_simulans_and_mauritiana.vs_{ref_genome}.bwaUniq.maleExpressionOnX_listWindowed_l10000_{mode}{rep}.frqShift.bed", sample = ["mauBackcrossMutant","mauBackcrossNormal","mauritiana","simBackcrossMutant","simBackcrossNormal","simulans"], ref_genome = ["prinDsim3"], mode = ["f","m"], rep = range(0,10)),    
+
+		popgen = ["data/intermediate/population_genetics/heterozygosity/freebayes/all.vs_droSim1.bwaUniq.het.w100000_s50000.bg"],
+
+
+
+
+	output:
+		pdf_out="results/Moehring_PsiSeqDev.pdf"
+	params:
+		runmem_gb=8,
+		runtime="1:00:00",
+		cores=2,
+	message:
+		"writing up the results.... "
+	run:
+		pandoc_path="/nas/longleaf/apps/rstudio/2021.09.2-382/bin/pandoc"
+		pwd = subprocess.check_output("pwd",shell=True).decode().rstrip()+"/"
+		shell("""mkdir -p results/figures/supp/ results/tables/supp/""")
+		shell(""" R -e "setwd('{pwd}');Sys.setenv(RSTUDIO_PANDOC='{pandoc_path}')" -e  "peaDubDee='{pwd}'; rmarkdown::render('markdowns/Moehring_PsiSeqDev.Rmd',output_file='{pwd}{output.pdf_out}')"  """)
+
+
+
+
+
+

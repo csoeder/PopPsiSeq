@@ -2,7 +2,7 @@
 
 from Bio import SeqIO
 
-# module load python/3.9.6 sratoolkit samtools freebayes vcftools bwa bedtools r/4.2.2 rstudio
+# module load python/3.9.6 sratoolkit samtools freebayes vcftools bwa bedtools r/4.2.2 rstudio bedops
 #PATH=$PATH:/nas/longleaf/home/csoeder/modules/vcflib/bin:/nas/longleaf/home/csoeder/modules/parallel/bin
 
 
