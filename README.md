@@ -63,7 +63,39 @@ In development, with unpublished data. Coming soon!
 # Usage Details
 ## Dependencies
 ## Configuration files
-## Structure
+## Structure and Files of Note
+
+PopPsiSeq/
+├── configurations  # configuration files - sample metadata, important filepaths, etc
+│   ├── config.basicExample.yaml
+│   └── ...
+├── data
+│   ├── external        # SRA downloads stored here
+│   ├── intermediate    # alignments, variant calls, etc
+│   ├── raw             # ie, unpublished
+│   ├── summaries       # summary data eg read QC
+│   └── ultimate        # windowed results are stored here
+├── markdowns       # markdown files for self-summary and writeup 
+│   ├── PopPsiSeq_basicExample.Rmd
+│   └── ...
+├── README.md
+├── scripts
+│   ├── freqShifter.R   # this is the script that polarizes and calculates the allele shift
+│   └── legacy          # unsupported code from v1 and v2
+│       ├── PsiSeq
+│       └── PsiSeq2
+├── Snakefile   # core pipeline
+├── utils
+│   ├── genelists
+│   ├── genome_windows
+│   ├── legacy
+│   │   └── PsiSeq.zip  # the SI for Earley 2011 is not currently available so it's mirrored here
+│   └── modules         # useful sub-pipelines
+│       ├── Snakefile.legacy
+│       └── Snakefile.popgentools
+└── workflows   # example use cases 
+    ├── Snakefile.basicExample
+    └── ...
 
 # Algorithm Description
 
