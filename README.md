@@ -64,7 +64,7 @@ In development, with unpublished data. Coming soon!
 ## Dependencies
 ## Configuration files
 ## Structure and Files of Note
-
+```bash
 PopPsiSeq/
 ├── configurations  # configuration files - sample metadata, important filepaths, etc
 │   ├── config.basicExample.yaml
@@ -96,6 +96,7 @@ PopPsiSeq/
 └── workflows   # example use cases 
     ├── Snakefile.basicExample
     └── ...
+```
 
 # Algorithm Description
 
