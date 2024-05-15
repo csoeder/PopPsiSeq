@@ -62,7 +62,7 @@ rule write_report:
 		pandoc_path="/nas/longleaf/apps/rstudio/2021.09.2-382/bin/pandoc"
 		pwd = subprocess.check_output("pwd",shell=True).decode().rstrip()+"/"
 		shell("""mkdir -p results/figures/supp/ results/tables/supp/""")
-		shell(""" R -e "setwd('{pwd}');Sys.setenv(RSTUDIO_PANDOC='{pandoc_path}')" -e  "peaDubDee='{pwd}'; rmarkdown::render('workflows/Moehring_PopPsiSeq.Rmd',output_file='{pwd}{output.pdf_out}')"  """)
+		shell(""" R -e "setwd('{pwd}');Sys.setenv(RSTUDIO_PANDOC='{pandoc_path}')" -e  "peaDubDee='{pwd}'; rmarkdown::render('markdowns/Moehring_PopPsiSeq.Rmd',output_file='{pwd}{output.pdf_out}')"  """)
 
 
 

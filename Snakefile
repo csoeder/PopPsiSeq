@@ -2,7 +2,7 @@
 
 from Bio import SeqIO
 
-# module load python/3.9.6 sratoolkit samtools freebayes vcftools bwa bedtools r/4.2.2 rstudio bedops
+# module load python/3.9.6 sratoolkit samtools freebayes vcftools bwa bedtools r/4.2.2 rstudio bedops; module unload perl
 #PATH=$PATH:/nas/longleaf/home/csoeder/modules/vcflib/bin:/nas/longleaf/home/csoeder/modules/parallel/bin
 
 
@@ -308,7 +308,7 @@ rule bam_reporter:
                 shell(""" 
                 rm -rf {input.bam_in}.dpth_by_chrom;
                 for chrom in $(cat {ref_genome_idx} | cut -f 1); do 
-                cat {input.bam_in}.dpth.tmp | grep -w "$chrom" | awk '{{sum+=$3; sumsq+=$3*$3}} END {{ print "average_depth\t",sum/NR; print "std_depth\t",sqrt(sumsq/NR - (sum/NR)**2)}}' | awk -v chr="$chrom" '{{print"{wildcards.sample}\t"chr"\t"$0}}' >>  {input.bam_in}.dpth_by_chrom ; 
+                cat {input.bam_in}.dpth.tmp | grep -w "$chrom" | awk '{{sum+=$3; sumsq+=$3*$3}} END {{ if(NR>0)  {{ print "average_depth\t",sum/NR; print "std_depth\t",sqrt(sumsq/NR - (sum/NR)**2) }} else {{ print "average_depth\t0"; print "std_depth\tNA" }} }}' | awk -v chr="$chrom" '{{print"{wildcards.sample}\t"chr"\t"$0}}' >>  {input.bam_in}.dpth_by_chrom  || true ; 
                 done  """)
 
                 shell("""rm {input.bam_in}.dpth.tmp """)
